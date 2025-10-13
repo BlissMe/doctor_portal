@@ -86,7 +86,7 @@ export default function Workbench() {
       const fetched = response.data.preferences.users || [];
       setUsers(fetched);
     } catch (error: any) {
-      console.error("Error fetching characters:", error?.message || error);
+      console.log("Error fetching characters:", error?.message || error);
       message.error("Failed to fetch users.");
     } finally {
       setLoading(false);

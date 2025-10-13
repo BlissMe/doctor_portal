@@ -3,7 +3,6 @@ import { cn } from "@/utils";
 import type { ReactNode } from "react";
 import AccountDropdown from "../components/account-dropdown";
 import BreadCrumb from "../components/bread-crumb";
-import NoticeButton from "../components/notice";
 import SettingButton from "../components/setting-button";
 
 interface HeaderProps {
@@ -29,7 +28,6 @@ export default function Header({ leftSlot }: HeaderProps) {
 			</div>
 
 			<div className="flex items-center gap-1">
-				<NoticeButton />
 				<SettingButton />
 				<AccountDropdown />
 			</div>
