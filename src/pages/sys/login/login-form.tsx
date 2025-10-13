@@ -24,7 +24,6 @@ import { useNavigate } from "react-router";
 import useUserStore from "@/store/userStore";
 import { StorageEnum } from "@/types/enum";
 import { setItem } from "@/utils/storage";
-import { validateUsername } from "@/utils/helper";
 
 export function LoginForm({
   className,
@@ -101,7 +100,6 @@ export function LoginForm({
             name="username"
             rules={{
               required: "Username is required",
-              validate: validateUsername,
             }}
             render={({ field, fieldState }) => (
               <FormItem>
