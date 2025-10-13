@@ -220,7 +220,6 @@ export default function Workbench() {
 
       message.success("Comment saved successfully!");
       setIsModalOpen(false);
-
       setUsers((prev) =>
         prev.map((u) =>
           u.userID === selectedUser.userID
@@ -372,7 +371,15 @@ export default function Workbench() {
                         {user.R_value && user.R_value > 0 ? (
                           <>
                             <div className="flex items-center gap-x-4">
-                              <Tag color={levelColor(user.level)}>
+                              <Tag
+                                color={levelColor(user.level)}
+                                style={{
+                                  fontSize: "14px",
+                                  height: "32px",
+                                  lineHeight: "32px",
+                                  padding: "0 12px",
+                                }}
+                              >
                                 {user.level}
                               </Tag>
                             </div>
@@ -392,7 +399,17 @@ export default function Workbench() {
                           </>
                         ) : (
                           <div className="flex items-center gap-x-4">
-                            <Tag color={levelColor("pending")}>Pending</Tag>
+                            <Tag
+                              color={levelColor("pending")}
+                              style={{
+                                fontSize: "14px",
+                                height: "32px",
+                                lineHeight: "32px",
+                                padding: "0 12px",
+                              }}
+                            >
+                              Pending
+                            </Tag>
                           </div>
                         )}
                       </div>
@@ -400,7 +417,7 @@ export default function Workbench() {
 
                     <td className="table-cell">
                       <Button
-                        className="w-48"
+                        className="w-48 text-black font-bold text-[12px]"
                         size="sm"
                         variant="default"
                         disabled={!!user.doctorComment || !user.level}
@@ -409,13 +426,18 @@ export default function Workbench() {
                         <Icon icon="mdi:plus" size={18} /> Add Comment
                       </Button>
                     </td>
-                     <td className="table-cell">
-                        {user.doctorComment || "Awaiting review"}
-                      
-                    </td>
+                    <td className="table-cell">{user.doctorComment || "-"}</td>
                     <td className="table-cell">
-                      <Tag color={levelColor(user.doctorLevel)}>
-                        {user.doctorLevel || "Awaiting review"}
+                      <Tag
+                        color={levelColor(user.doctorLevel)}
+                        style={{
+                          fontSize: "14px",
+                          height: "32px",
+                          lineHeight: "32px",
+                          padding: "0 12px",
+                        }}
+                      >
+                        {user.doctorLevel || "-"}
                       </Tag>
                     </td>
                   </tr>

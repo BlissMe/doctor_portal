@@ -1,5 +1,5 @@
 import bgImg from "@/assets/images/background/banner-1.png";
-import Character from "@/assets/images/characters/character_3.png";
+import Character from "@/assets/images/characters/image-removebg-preview (2).png";
 import { Icon } from "@/components/icon";
 import { GLOBAL_CONFIG } from "@/global-config";
 import { Button } from "@/ui/button";
@@ -29,12 +29,12 @@ export default function BannerCard() {
               <Title as="h2" className="text-white">
                 Welcome to {GLOBAL_CONFIG.appName} Dashboard
               </Title>
-              <Text className="text-white">
+              <Text className="text-white font-bold italic">
                 Here you can monitor and manage your patients' mental health
                 efficiently and stay informed about their well-being.
               </Text>
 
-              <Button variant="outline" className="w-fit bg-white text-black">
+              <Button variant="outline" className="w-fit bg-white text-black mt-2">
                 <Icon icon="carbon:logo-slack" size={24} />
                 <span className="ml-2 font-black">Get Started</span>
               </Button>
@@ -45,7 +45,6 @@ export default function BannerCard() {
             <div className="w-full h-full flex items-center justify-end">
               <img
                 src={Character}
-                className="w-56 h-56"
                 alt="doctor character"
               />
             </div>
