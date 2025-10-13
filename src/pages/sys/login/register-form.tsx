@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { Button } from "@/ui/button";
@@ -17,9 +16,8 @@ import { Icon } from "@/components/icon";
 import { useTranslation } from "react-i18next";
 
 function RegisterForm() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const { loginState, setLoginState } = useLoginStateContext();
+  const { setLoginState, backToLogin } = useLoginStateContext();
   const { t } = useTranslation();
 
   const form = useForm({
@@ -39,7 +37,7 @@ function RegisterForm() {
 
       if (response.message === "Successfully Registered") {
         toast.success("Signup Successful");
-        navigate("/mode/nick-name", { replace: true });
+        backToLogin();
       } else {
         toast.error("Signup failed. Please try again later");
       }

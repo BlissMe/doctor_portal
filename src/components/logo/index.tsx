@@ -1,17 +1,11 @@
-import { cn } from "@/utils";
-import { NavLink } from "react-router";
-import { Icon } from "../icon";
+import logo from "@/assets/images/characters//logoShort.png";
 
-interface Props {
-	size?: number | string;
-	className?: string;
-}
-function Logo({ size = 50, className }: Props) {
-	return (
-		<NavLink to="/" className={cn(className)}>
-			<Icon icon="local:ic-logo-badge" size={size} color="var(--colors-palette-primary-default)" />
-		</NavLink>
-	);
+
+function Logo() {
+  return (
+           <img src={logo} alt="Logo" className="h-10 w-auto" />
+
+  );
 }
 
 export default Logo;
