@@ -13,7 +13,10 @@ import { cn } from "@/utils";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider";
+import {
+  LoginStateEnum,
+  useLoginStateContext,
+} from "./providers/login-provider";
 import { userSignInService } from "@/api/services/userAuthService";
 import { useForm } from "react-hook-form";
 import { GLOBAL_CONFIG } from "@/global-config";
@@ -21,13 +24,17 @@ import { useNavigate } from "react-router";
 import useUserStore from "@/store/userStore";
 import { StorageEnum } from "@/types/enum";
 import { setItem } from "@/utils/storage";
+import { validateUsername } from "@/utils/helper";
 
-export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<"form">) {
+export function LoginForm({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<"form">) {
   const [loading, setLoading] = useState(false);
   const [remember, setRemember] = useState(true);
   const { loginState, setLoginState } = useLoginStateContext();
-	const navigate = useNavigate();
-const { actions } = useUserStore();
+  const navigate = useNavigate();
+  const { actions } = useUserStore();
 
   const form = useForm({
     defaultValues: {
@@ -38,49 +45,45 @@ const { actions } = useUserStore();
 
   if (loginState !== LoginStateEnum.LOGIN) return null;
 
+  const handleFinish = async (values: any) => {
+    console.log("Login attempt with values:", values);
+    setLoading(true);
 
-const handleFinish = async (values: any) => {
-  console.log("Login attempt with values:", values);
-  setLoading(true);
+    try {
+      const response = await userSignInService(values);
+      console.log("Response from API:", response);
 
-  try {
-    const response = await userSignInService(values);
-    console.log("Response from API:", response);
+      if (response.message === "Login successful" && response.data) {
+        console.log("Login successful, proceeding...");
+        setItem(StorageEnum.UserToken, response.data.token);
+        console.log(response.data.token);
+        toast.success("Login Successful");
 
-    if (response.message === "Login successful" && response.data) {
-      console.log("Login successful, proceeding...");
-setItem(StorageEnum.UserToken, response.data.token);
-console.log(response.data.token)
-      toast.success("Login Successful");
+        // Navigate first to avoid unmount issues
+        console.log("Navigating to:", GLOBAL_CONFIG.defaultRoute);
+        navigate(GLOBAL_CONFIG.defaultRoute, { replace: true });
 
-      // Navigate first to avoid unmount issues
-      console.log("Navigating to:", GLOBAL_CONFIG.defaultRoute);
-      navigate(GLOBAL_CONFIG.defaultRoute, { replace: true });
-
-      // Then safely update Zustand store
-      console.log("Saving token and user info to store...");
-      actions.setUserToken({ token: response.data.token });
-      actions.setUserInfo({
-        username: response.data.username,
-        doctorID: response.data.doctorID,
-        role: response.data.role,
-        email: "",
-      });
-    } else {
-      console.log("Login failed with message:", response.message);
-      toast.error(response.message || "Login failed");
+        // Then safely update Zustand store
+        console.log("Saving token and user info to store...");
+        actions.setUserToken({ token: response.data.token });
+        actions.setUserInfo({
+          username: response.data.username,
+          doctorID: response.data.doctorID,
+          role: response.data.role,
+          email: "",
+        });
+      } else {
+        console.log("Login failed with message:", response.message);
+        toast.error(response.message || "Login failed");
+      }
+    } catch (error: any) {
+      console.log("Error during login:", error);
+      toast.error(error.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+      console.log("Loading set to false");
     }
-  } catch (error: any) {
-    console.log("Error during login:", error);
-    toast.error(error.message || "Something went wrong");
-  } finally {
-    setLoading(false);
-    console.log("Loading set to false");
-  }
-};
-
-
-
+  };
 
   return (
     <div className={cn("flex flex-col gap-6", className)}>
@@ -96,14 +99,18 @@ console.log(response.data.token)
           <FormField
             control={form.control}
             name="username"
-            rules={{ required: "Username is required" }}
-            render={({ field }) => (
+            rules={{
+              required: "Username is required",
+              validate: validateUsername,
+            }}
+            render={({ field, fieldState }) => (
               <FormItem>
-                <FormLabel>Username</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter your username" {...field} />
                 </FormControl>
-                <FormMessage />
+                {fieldState.error && (
+                  <FormMessage>{fieldState.error.message}</FormMessage>
+                )}
               </FormItem>
             )}
           />
@@ -116,7 +123,11 @@ console.log(response.data.token)
               <FormItem>
                 <FormLabel>Password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Enter your password" {...field} />
+                  <Input
+                    type="password"
+                    placeholder="Enter your password"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -169,4 +180,4 @@ console.log(response.data.token)
   );
 }
 
-export default LoginForm;  
+export default LoginForm;

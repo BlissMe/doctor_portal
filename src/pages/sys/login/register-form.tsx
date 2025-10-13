@@ -6,13 +6,21 @@ import { Button } from "@/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/ui/form";
 import { Input } from "@/ui/input";
 
-import { ReturnButton } from "./components/ReturnButton";
 import { userSignUpService } from "@/api/services/userAuthService";
 import { useForm } from "react-hook-form";
+import { validateUsername, passwordFieldValidation } from "@/utils/helper";
+import {
+  LoginStateEnum,
+  useLoginStateContext,
+} from "./providers/login-provider";
+import { Icon } from "@/components/icon";
+import { useTranslation } from "react-i18next";
 
 function RegisterForm() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const { loginState, setLoginState } = useLoginStateContext();
+  const { t } = useTranslation();
 
   const form = useForm({
     defaultValues: {
@@ -21,11 +29,9 @@ function RegisterForm() {
       password: "",
       confirmPassword: "",
     },
+    mode: "onChange",
   });
-
-  const backToLogin = () => {
-    navigate("/login", { replace: true });
-  };
+  if (loginState !== LoginStateEnum.REGISTER) return null;
 
   const onFinish = async (values: any) => {
     try {
@@ -52,20 +58,27 @@ function RegisterForm() {
           <h1 className="text-2xl font-bold">Sign Up</h1>
         </div>
 
+        {/* Username */}
         <FormField
           control={form.control}
           name="username"
-          rules={{ required: "Username is required" }}
-          render={({ field }) => (
+          rules={{
+            required: "Username is required",
+            validate: validateUsername,
+          }}
+          render={({ field, fieldState }) => (
             <FormItem>
               <FormControl>
                 <Input placeholder="Enter your username" {...field} />
               </FormControl>
-              <FormMessage />
+              {fieldState.error && (
+                <FormMessage>{fieldState.error.message}</FormMessage>
+              )}
             </FormItem>
           )}
         />
 
+        {/* Email */}
         <FormField
           control={form.control}
           name="email"
@@ -76,63 +89,81 @@ function RegisterForm() {
               message: "Invalid email address",
             },
           }}
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormItem>
               <FormControl>
                 <Input placeholder="Enter your email" {...field} />
               </FormControl>
-              <FormMessage />
+              {fieldState.error && (
+                <FormMessage>{fieldState.error.message}</FormMessage>
+              )}
             </FormItem>
           )}
         />
 
+        {/* Password */}
         <FormField
           control={form.control}
           name="password"
-          rules={{ required: "Password is required" }}
-          render={({ field }) => (
+          rules={{
+            required: "Password is required",
+            validate: passwordFieldValidation,
+          }}
+          render={({ field, fieldState }) => (
             <FormItem>
               <FormControl>
-                <Input type="password" placeholder="Enter your password" {...field} />
+                <Input
+                  type="password"
+                  placeholder="Enter your password"
+                  {...field}
+                />
               </FormControl>
-              <FormMessage />
+              {fieldState.error && (
+                <FormMessage>{fieldState.error.message}</FormMessage>
+              )}
             </FormItem>
           )}
         />
 
+        {/* Confirm Password */}
         <FormField
           control={form.control}
           name="confirmPassword"
           rules={{
             required: "Confirm password is required",
-            validate: (value) => value === form.getValues("password") || "Passwords do not match",
+            validate: (value) =>
+              value === form.getValues("password") || "Passwords do not match",
           }}
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormItem>
               <FormControl>
-                <Input type="password" placeholder="Confirm your password" {...field} />
+                <Input
+                  type="password"
+                  placeholder="Confirm your password"
+                  {...field}
+                />
               </FormControl>
-              <FormMessage />
+              {fieldState.error && (
+                <FormMessage>{fieldState.error.message}</FormMessage>
+              )}
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="w-full">
-          Register
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Registering..." : "Register"}
         </Button>
 
-        <div className="mb-2 text-xs text-gray-500">
-          <span>By registering, you agree to our </span>
-          <a href="./" className="text-sm underline text-primary">
-            Terms of Service
-          </a>
-          {" & "}
-          <a href="./" className="text-sm underline text-primary">
-            Privacy Policy
-          </a>
+        <div className="text-center text-sm">
+          <Button
+            variant="link"
+            className="px-1"
+            onClick={() => setLoginState(LoginStateEnum.LOGIN)}
+          >
+            <Icon icon="solar:alt-arrow-left-linear" size={20} />
+            <span className="text-sm">{t("sys.login.backSignIn")}</span>
+          </Button>
         </div>
-
-        <ReturnButton onClick={backToLogin} />
       </form>
     </Form>
   );
