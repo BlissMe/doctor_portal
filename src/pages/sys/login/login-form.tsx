@@ -103,6 +103,7 @@ export function LoginForm({
             }}
             render={({ field, fieldState }) => (
               <FormItem>
+                <FormLabel>Username</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter your username" {...field} />
                 </FormControl>

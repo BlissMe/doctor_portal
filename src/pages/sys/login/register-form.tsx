@@ -2,7 +2,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/ui/button";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/ui/form";
 import { Input } from "@/ui/input";
 
 import { userSignUpService } from "@/api/services/userAuthService";
@@ -65,6 +72,7 @@ function RegisterForm() {
           }}
           render={({ field, fieldState }) => (
             <FormItem>
+              <FormLabel>Username</FormLabel>
               <FormControl>
                 <Input placeholder="Enter your username" {...field} />
               </FormControl>
@@ -88,6 +96,7 @@ function RegisterForm() {
           }}
           render={({ field, fieldState }) => (
             <FormItem>
+              <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input placeholder="Enter your email" {...field} />
               </FormControl>
@@ -108,6 +117,7 @@ function RegisterForm() {
           }}
           render={({ field, fieldState }) => (
             <FormItem>
+              <FormLabel>Password</FormLabel>
               <FormControl>
                 <Input
                   type="password"
@@ -133,6 +143,7 @@ function RegisterForm() {
           }}
           render={({ field, fieldState }) => (
             <FormItem>
+              <FormLabel>Confirm Password</FormLabel>
               <FormControl>
                 <Input
                   type="password"
