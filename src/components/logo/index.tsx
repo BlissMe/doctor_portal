@@ -1,16 +1,10 @@
-import { Icon } from "../icon";
+import logo from "@/assets/images/characters//logoShort.png";
 
-interface Props {
-  size?: number | string;
-  className?: string;
-}
-function Logo({ size = 50 }: Props) {
+
+function Logo() {
   return (
-    <Icon
-      icon="local:ic-logo-badge"
-      size={size}
-      color="var(--colors-palette-primary-default)"
-    />
+           <img src={logo} alt="Logo" className="h-10 w-auto" />
+
   );
 }
 
