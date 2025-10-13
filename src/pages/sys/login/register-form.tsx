@@ -31,7 +31,6 @@ function RegisterForm() {
     },
     mode: "onChange",
   });
-  if (loginState !== LoginStateEnum.REGISTER) return null;
 
   const onFinish = async (values: any) => {
     try {

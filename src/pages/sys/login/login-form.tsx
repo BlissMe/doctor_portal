@@ -69,7 +69,7 @@ export function LoginForm({
           username: response.data.username,
           doctorID: response.data.doctorID,
           role: response.data.role,
-          email: "",
+          email: response.data.email,
         });
       } else {
         console.log("Login failed with message:", response.message);
