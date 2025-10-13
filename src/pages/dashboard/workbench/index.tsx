@@ -11,7 +11,6 @@ import axios from "axios";
 import { Activity, HeartPulse, TrendingUp, User, Users } from "lucide-react";
 import {
   message,
-  Typography,
   Progress,
   Tag,
   Modal,
@@ -53,6 +52,8 @@ const levelColor = (lvl?: string) => {
       return "gold";
     case "severe":
       return "red";
+    case "pending":
+      return "blue";
     default:
       return "default";
   }
@@ -67,10 +68,14 @@ export default function Workbench() {
   const [comment, setComment] = useState("");
   const apiBase = import.meta.env.VITE_APP_API_BASE_URL;
   useEffect(() => {
-    fetchAllUsers();
-    fetchLevelDetection();
-    fetchDoctorLevels();
+    const loadData = async () => {
+      await fetchAllUsers();
+      await fetchLevelDetection();
+      await fetchDoctorLevels();
+    };
+    loadData();
   }, [apiBase]);
+
   const fetchAllUsers = async () => {
     setLoading(true);
     const token = getItem(StorageEnum.UserToken);
@@ -122,10 +127,9 @@ export default function Workbench() {
               headers: { Authorization: `Bearer ${token}` },
             });
 
-            const isComplete = last.data.answeredCount === 9;
             return {
               ...ld,
-              level: isComplete ? ld.level : "Pending",
+              level: ld.level || "pending",
               lastSessionID: last.data.sessionID,
             } as User;
           } catch (err) {
@@ -134,12 +138,11 @@ export default function Workbench() {
               ld.userID,
               err
             );
-            return { ...ld, level: "Pending", lastSessionID: null } as User;
           }
+          return { ...ld, level: ld.level || "pending" } as User;
         })
       );
 
-      // Merge with users (prefer preserving existing user fields like nickname)
       setUsers((prevUsers) =>
         prevUsers.map((user) => {
           const match = updatedUsers.find((u) => u.userID === user.userID);
@@ -339,7 +342,8 @@ export default function Workbench() {
                 <tr className="table-row">
                   <th className="table-head">#</th>
                   <th className="table-head">Nickname</th>
-                  <th className="table-head">Actions</th>
+                  <th className="table-head">UserId</th>
+                  <th className="table-head">Depression Level</th>
                   <th className="table-head">Actions</th>
                   <th className="table-head">Comment</th>
                   <th className="table-head">Doctor Level</th>
@@ -356,47 +360,62 @@ export default function Workbench() {
                         </p>
                       </div>
                     </td>
+                    <td className="table-cell">
+                      <div className="flex flex-col">
+                        <p className="font-medium text-slate-900 dark:text-slate-50">
+                          {user.userID}
+                        </p>
+                      </div>
+                    </td>
                     <td className="table-cell text-white">
                       <div className="flex flex-col text-white">
-                        <Typography.Text strong className="text-white">
-                          Composite Index (R)
-                        </Typography.Text>
-                        <Progress
-                          percent={Math.round(Number(user.R_value || 0) * 100)}
-                          status="active"
-                          strokeColor={
-                            levelColor(user.level) === "gold"
-                              ? "#faad14"
-                              : levelColor(user.level) === "red"
-                              ? "#ff4d4f"
-                              : "#52c41a"
-                          }
-                          trailColor="rgba(255, 255, 255, 0.2)"
-                          showInfo
-                        />
+                        {user.R_value && user.R_value > 0 ? (
+                          <>
+                            <div className="flex items-center gap-x-4">
+                              <Tag color={levelColor(user.level)}>
+                                {user.level}
+                              </Tag>
+                            </div>
+                            <Progress
+                              percent={Math.round(Number(user.R_value) * 100)}
+                              status="active"
+                              strokeColor={
+                                levelColor(user.level) === "gold"
+                                  ? "#faad14"
+                                  : levelColor(user.level) === "red"
+                                  ? "#ff4d4f"
+                                  : "#52c41a"
+                              }
+                              trailColor="rgba(255, 255, 255, 0.2)"
+                              showInfo
+                            />
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-x-4">
+                            <Tag color={levelColor("pending")}>Pending</Tag>
+                          </div>
+                        )}
                       </div>
                     </td>
-                    <td className="table-cell">
-                      <div className="flex items-center gap-x-4">
-                        <Tag color={levelColor(user.level)}>{user.level}</Tag>
-                      </div>
-                    </td>
+
                     <td className="table-cell">
                       <Button
                         className="w-48"
                         size="sm"
                         variant="default"
-                        disabled={
-                          !!user.doctorComment || user.level === "Pending"
-                        }
+                        disabled={!!user.doctorComment || !user.level}
                         onClick={() => openCommentModal(user)}
                       >
                         <Icon icon="mdi:plus" size={18} /> Add Comment
                       </Button>
                     </td>
+                     <td className="table-cell">
+                        {user.doctorComment || "Awaiting review"}
+                      
+                    </td>
                     <td className="table-cell">
                       <Tag color={levelColor(user.doctorLevel)}>
-                        {user.doctorLevel || "N/A"}
+                        {user.doctorLevel || "Awaiting review"}
                       </Tag>
                     </td>
                   </tr>

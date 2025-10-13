@@ -59,8 +59,8 @@ export function LoginForm({
         toast.success("Login Successful");
 
         // Navigate first to avoid unmount issues
-        console.log("Navigating to:", GLOBAL_CONFIG.defaultRoute);
-        navigate(GLOBAL_CONFIG.defaultRoute, { replace: true });
+        console.log("Navigating to:", GLOBAL_CONFIG.dashPath);
+        navigate(GLOBAL_CONFIG.dashPath, { replace: true });
 
         // Then safely update Zustand store
         console.log("Saving token and user info to store...");

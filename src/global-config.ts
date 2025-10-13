@@ -16,6 +16,8 @@ export type GlobalConfig = {
 	apiBaseUrl: string;
 	/** Routing mode: frontend routing or backend routing */
 	routerMode: "frontend" | "backend";
+	/** Dashboard path */
+	dashPath: string;
 };
 
 /**
@@ -28,8 +30,9 @@ export type GlobalConfig = {
 export const GLOBAL_CONFIG: GlobalConfig = {
 	appName: "Doctor Portal",
 	appVersion: packageJson.version,
-	defaultRoute: import.meta.env.VITE_APP_DEFAULT_ROUTE || "/workbench",
+	defaultRoute: import.meta.env.VITE_APP_DEFAULT_ROUTE || "/auth/login",
 	publicPath: import.meta.env.VITE_APP_PUBLIC_PATH || "/",
 	apiBaseUrl: import.meta.env.VITE_APP_API_BASE_URL,
 	routerMode: import.meta.env.VITE_APP_ROUTER_MODE || "frontend",
+	dashPath: import.meta.env.VITE_APP_PUBLIC_PATH_DASH || "/workbench",
 };
