@@ -340,7 +340,6 @@ export default function Workbench() {
                 <tr className="table-row">
                   <th className="table-head">#</th>
                   <th className="table-head">Nickname</th>
-                  <th className="table-head">UserId</th>
                   <th className="table-head">Depression Level</th>
                   <th className="table-head">Actions</th>
                   <th className="table-head">Comment</th>
@@ -355,13 +354,6 @@ export default function Workbench() {
                       <div className="flex flex-col">
                         <p className="font-medium text-slate-900 dark:text-slate-50">
                           {user.nickname}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="table-cell">
-                      <div className="flex flex-col">
-                        <p className="font-medium text-slate-900 dark:text-slate-50">
-                          {user.userID}
                         </p>
                       </div>
                     </td>
