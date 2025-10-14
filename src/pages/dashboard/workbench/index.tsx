@@ -11,7 +11,6 @@ import axios from "axios";
 import { Activity, HeartPulse, TrendingUp, User, Users } from "lucide-react";
 import {
   message,
-  Progress,
   Tag,
   Modal,
   Input as AntdInput,
@@ -383,19 +382,6 @@ export default function Workbench() {
                                 {user.level}
                               </Tag>
                             </div>
-                            <Progress
-                              percent={Math.round(Number(user.R_value) * 100)}
-                              status="active"
-                              strokeColor={
-                                levelColor(user.level) === "gold"
-                                  ? "#faad14"
-                                  : levelColor(user.level) === "red"
-                                  ? "#ff4d4f"
-                                  : "#52c41a"
-                              }
-                              trailColor="rgba(255, 255, 255, 0.2)"
-                              showInfo
-                            />
                           </>
                         ) : (
                           <div className="flex items-center gap-x-4">
