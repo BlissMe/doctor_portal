@@ -1,5 +1,3 @@
-import Icon from "@/components/icon/icon";
-import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
 import { Text, Title } from "@/ui/typography";
 import { rgbAlpha } from "@/utils/theme";
@@ -9,19 +7,14 @@ import { getItem } from "@/utils/storage";
 import { StorageEnum } from "@/types/enum";
 import axios from "axios";
 import { Activity, HeartPulse, TrendingUp, User, Users } from "lucide-react";
-import {
-  message,
-  Tag,
-  Modal,
-  Input as AntdInput,
-  Select as AntdSelect,
-} from "antd";
+import { message, Tag } from "antd";
 
 interface User {
   userID: number;
   nickname: string;
   virtualCharacter?: string;
   inputMode?: string;
+  depressionLevel?: string;
   level?: string;
   R_value?: number;
   createdAt?: string;
@@ -34,13 +27,7 @@ interface User {
     minimal_max: number;
     moderate_max: number;
   };
-  doctorData?: {
-    doctorLevel?: string;
-    doctorComment?: string;
-  };
   lastSessionID?: string | null;
-  doctorLevel?: string;
-  doctorComment?: string;
 }
 
 const levelColor = (lvl?: string) => {
@@ -60,17 +47,11 @@ const levelColor = (lvl?: string) => {
 
 export default function Workbench() {
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedLevel, setSelectedLevel] = useState<string>("");
-  const [comment, setComment] = useState("");
-  const apiBase = import.meta.env.VITE_APP_API_BASE_URL1;
+  const [loading, setLoading] = useState<boolean>(false);
+  const apiBase = import.meta.env.VITE_APP_API_BASE_URL2;
   useEffect(() => {
     const loadData = async () => {
       await fetchAllUsers();
-      await fetchLevelDetection();
-      await fetchDoctorLevels();
     };
     loadData();
   }, [apiBase]);
@@ -94,141 +75,6 @@ export default function Workbench() {
       message.error("Failed to fetch users.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchLevelDetection = async () => {
-    const token = getItem(StorageEnum.UserToken);
-    try {
-      const res = await axios.get<{
-        success: boolean;
-        data: {
-          userID: number;
-          R_value: number;
-          level: string;
-          createdAt: string;
-          components?: { classifier?: { emotion?: string } };
-        }[];
-      }>(`${apiBase}/levelDetection/all-users-latest-index`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const levelData = res.data.data || [];
-
-      const updatedUsers = await Promise.all(
-        levelData.map(async (ld) => {
-          try {
-            const last = await axios.get<{
-              success: boolean;
-              sessionID: string | null;
-              answeredCount: number;
-            }>(`${apiBase}/phq9/last-session/${ld.userID}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-
-            return {
-              ...ld,
-              level: ld.level || "pending",
-              lastSessionID: last.data.sessionID,
-            } as User;
-          } catch (err) {
-            console.error(
-              "Error fetching PHQ9 session for user",
-              ld.userID,
-              err
-            );
-          }
-          return { ...ld, level: ld.level || "pending" } as User;
-        })
-      );
-
-      setUsers((prevUsers) =>
-        prevUsers.map((user) => {
-          const match = updatedUsers.find((u) => u.userID === user.userID);
-          return match
-            ? {
-                ...user,
-                level: match.level,
-                R_value: match.R_value,
-                components: match.components,
-                createdAt: match.createdAt,
-                lastSessionID: match.lastSessionID,
-              }
-            : user;
-        })
-      );
-    } catch (error: any) {
-      console.error("Error fetching levels:", error?.message || error);
-      // not fatal, continue
-    }
-  };
-
-  const fetchDoctorLevels = async () => {
-    const token = getItem(StorageEnum.UserToken);
-    try {
-      const res = await axios.get<{
-        success: boolean;
-        data: { userID: number; level?: string; comment?: string }[];
-      }>(`${apiBase}/doctorlevel/comments`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const doctorData = res.data.data || [];
-
-      setUsers((prevUsers) =>
-        prevUsers.map((user) => {
-          const match = doctorData.find((d) => d.userID === user.userID);
-          return match
-            ? {
-                ...user,
-                doctorLevel: match.level,
-                doctorComment: match.comment,
-              }
-            : user;
-        })
-      );
-    } catch (err: any) {
-      console.error("Error fetching doctor levels:", err?.message || err);
-    }
-  };
-  const openCommentModal = (user: User) => {
-    setSelectedUser(user);
-    setSelectedLevel(user.level || "");
-    setComment(user.doctorComment || "");
-    setIsModalOpen(true);
-  };
-
-  const handleCancel = () => {
-    setIsModalOpen(false);
-  };
-
-  const handleSubmitComment = async () => {
-    if (!selectedUser) return;
-    const token = getItem(StorageEnum.UserToken);
-
-    try {
-      await axios.post(
-        `${apiBase}/doctorlevel/comments`,
-        {
-          userID: selectedUser.userID,
-          comment,
-          level: selectedLevel,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      message.success("Comment saved successfully!");
-      setIsModalOpen(false);
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.userID === selectedUser.userID
-            ? { ...u, doctorLevel: selectedLevel, doctorComment: comment }
-            : u
-        )
-      );
-    } catch (error: any) {
-      console.error("Error saving comment:", error?.message || error);
-      message.error("Failed to save comment.");
     }
   };
 
@@ -339,11 +185,9 @@ export default function Workbench() {
               <thead className="table-header">
                 <tr className="table-row">
                   <th className="table-head">#</th>
-                   <th className="table-head">Nickname</th>
+                  <th className="table-head">Nickname</th>
                   <th className="table-head">System Assessment</th>
-                  <th className="table-head">Manage Assessment</th>
-                  <th className="table-head">Assessment Notes</th>
-                  <th className="table-head">Medical Assessment</th>
+                  <th className="table-head">Self Assessment</th>
                 </tr>
               </thead>
               <tbody className="table-body">
@@ -394,20 +238,8 @@ export default function Workbench() {
                     </td>
 
                     <td className="table-cell">
-                      <Button
-                        className="w-48 text-black font-bold text-[12px]"
-                        size="sm"
-                        variant="default"
-                        disabled={!!user.doctorComment || !user.level}
-                        onClick={() => openCommentModal(user)}
-                      >
-                        <Icon icon="mdi:plus" size={18} /> Add Comment
-                      </Button>
-                    </td>
-                    <td className="table-cell">{user.doctorComment || "-"}</td>
-                    <td className="table-cell">
                       <Tag
-                        color={levelColor(user.doctorLevel)}
+                        color={levelColor(user.depressionLevel)}
                         style={{
                           fontSize: "14px",
                           height: "32px",
@@ -415,7 +247,7 @@ export default function Workbench() {
                           padding: "0 12px",
                         }}
                       >
-                        {user.doctorLevel || "-"}
+                        {user.depressionLevel || "-"}
                       </Tag>
                     </td>
                   </tr>
@@ -425,32 +257,6 @@ export default function Workbench() {
           </div>
         </Card>
       </div>
-      <Modal
-        title={`Add Comment for ${selectedUser?.nickname || ""}`}
-        open={isModalOpen}
-        onCancel={handleCancel}
-        onOk={handleSubmitComment}
-        okText="Save Comment"
-      >
-        <div className="flex flex-col gap-3">
-          <AntdSelect
-            value={selectedLevel}
-            onChange={(val) => setSelectedLevel(val)}
-            placeholder="Select Depression Level"
-          >
-            <AntdSelect.Option value="Minimal">Minimal</AntdSelect.Option>
-            <AntdSelect.Option value="Moderate">Moderate</AntdSelect.Option>
-            <AntdSelect.Option value="Severe">Severe</AntdSelect.Option>
-          </AntdSelect>
-
-          <AntdInput.TextArea
-            rows={4}
-            placeholder="Enter your comment..."
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-          />
-        </div>
-      </Modal>
     </div>
   );
 }

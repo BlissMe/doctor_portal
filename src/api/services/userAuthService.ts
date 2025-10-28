@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_APP_API_BASE_URL;
+const API_URL = import.meta.env.VITE_APP_API_BASE_URL2;
 const metadataServiceURL = `${API_URL}/`;
 
 interface SignUpPayload {
