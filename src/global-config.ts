@@ -32,7 +32,8 @@ export const GLOBAL_CONFIG: GlobalConfig = {
 	appVersion: packageJson.version,
 	defaultRoute: import.meta.env.VITE_APP_DEFAULT_ROUTE || "/auth/login",
 	publicPath: import.meta.env.VITE_APP_PUBLIC_PATH || "/",
-	apiBaseUrl: import.meta.env.VITE_APP_API_BASE_URL,
+	apiBaseUrl1: import.meta.env.VITE_APP_API_BASE_URL1,
+	apiBaseUrl2: import.meta.env.VITE_APP_API_BASE_URL2,
 	routerMode: import.meta.env.VITE_APP_ROUTER_MODE || "frontend",
 	dashPath: import.meta.env.VITE_APP_PUBLIC_PATH_DASH || "/workbench",
 };

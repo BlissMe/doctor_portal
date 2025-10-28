@@ -214,7 +214,7 @@ export default function Workbench() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<string>("");
   const [comment, setComment] = useState("");
-  const apiBase = import.meta.env.VITE_APP_API_BASE_URL;
+  const apiBase = import.meta.env.VITE_APP_API_BASE_URL1;
   useEffect(() => {
     fetchAllUsers();
     fetchLevelDetection();

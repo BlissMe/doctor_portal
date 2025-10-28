@@ -47,17 +47,11 @@ const levelColor = (lvl?: string) => {
 
 export default function Workbench() {
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedLevel, setSelectedLevel] = useState<string>("");
-  const [comment, setComment] = useState("");
-  const apiBase = import.meta.env.VITE_APP_API_BASE_URL;
+  const [loading, setLoading] = useState<boolean>(false);
+  const apiBase = import.meta.env.VITE_APP_API_BASE_URL2;
   useEffect(() => {
     const loadData = async () => {
       await fetchAllUsers();
-      await fetchLevelDetection();
-      await fetchDoctorLevels();
     };
     loadData();
   }, [apiBase]);
@@ -81,72 +75,6 @@ export default function Workbench() {
       message.error("Failed to fetch users.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchLevelDetection = async () => {
-    const token = getItem(StorageEnum.UserToken);
-    try {
-      const res = await axios.get<{
-        success: boolean;
-        data: {
-          userID: number;
-          R_value: number;
-          level: string;
-          createdAt: string;
-          components?: { classifier?: { emotion?: string } };
-        }[];
-      }>(`${apiBase}/levelDetection/all-users-latest-index`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const levelData = res.data.data || [];
-
-      const updatedUsers = await Promise.all(
-        levelData.map(async (ld) => {
-          try {
-            const last = await axios.get<{
-              success: boolean;
-              sessionID: string | null;
-              answeredCount: number;
-            }>(`${apiBase}/phq9/last-session/${ld.userID}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-
-            return {
-              ...ld,
-              level: ld.level || "pending",
-              lastSessionID: last.data.sessionID,
-            } as User;
-          } catch (err) {
-            console.error(
-              "Error fetching PHQ9 session for user",
-              ld.userID,
-              err
-            );
-          }
-          return { ...ld, level: ld.level || "pending" } as User;
-        })
-      );
-
-      setUsers((prevUsers) =>
-        prevUsers.map((user) => {
-          const match = updatedUsers.find((u) => u.userID === user.userID);
-          return match
-            ? {
-                ...user,
-                level: match.level,
-                R_value: match.R_value,
-                components: match.components,
-                createdAt: match.createdAt,
-                lastSessionID: match.lastSessionID,
-              }
-            : user;
-        })
-      );
-    } catch (error: any) {
-      console.error("Error fetching levels:", error?.message || error);
-      // not fatal, continue
     }
   };
 
