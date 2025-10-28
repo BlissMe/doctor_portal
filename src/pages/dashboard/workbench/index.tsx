@@ -339,11 +339,11 @@ export default function Workbench() {
               <thead className="table-header">
                 <tr className="table-row">
                   <th className="table-head">#</th>
-                  <th className="table-head">Nickname</th>
-                  <th className="table-head">Depression Level</th>
-                  <th className="table-head">Actions</th>
-                  <th className="table-head">Comment</th>
-                  <th className="table-head">Doctor Level</th>
+                   <th className="table-head">Nickname</th>
+                  <th className="table-head">System Assessment</th>
+                  <th className="table-head">Manage Assessment</th>
+                  <th className="table-head">Assessment Notes</th>
+                  <th className="table-head">Medical Assessment</th>
                 </tr>
               </thead>
               <tbody className="table-body">
