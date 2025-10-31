@@ -28,7 +28,7 @@ export type GlobalConfig = {
  * Please don't use the import.meta.env to get the configuration, use the GLOBAL_CONFIG instead
  */
 export const GLOBAL_CONFIG: GlobalConfig = {
-	appName: "BlissCare",
+	appName: "BlissMe",
 	appVersion: packageJson.version,
 	defaultRoute: import.meta.env.VITE_APP_DEFAULT_ROUTE || "/auth/login",
 	publicPath: import.meta.env.VITE_APP_PUBLIC_PATH || "/",
