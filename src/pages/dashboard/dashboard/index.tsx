@@ -263,11 +263,17 @@ export default function Workbench() {
                     <td className="table-cell">{index + 1}</td>
                     <td className="table-cell">
                       <div className="flex flex-col">
-                        <p className="font-medium text-slate-900 dark:text-slate-50">
-                          {user.nickname}
+                        <p
+                          className="font-medium text-slate-900 dark:text-slate-50 truncate max-w-[120px]"
+                          title={user.nickname}
+                        >
+                          {user.nickname.length > 10
+                            ? `${user.nickname.slice(0, 10)}...`
+                            : user.nickname}
                         </p>
                       </div>
                     </td>
+
                     <td className="table-cell text-white">
                       <div className="flex flex-col text-white">
                         {user.R_value && user.R_value > 0 ? (
