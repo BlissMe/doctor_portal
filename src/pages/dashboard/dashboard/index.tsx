@@ -6,7 +6,14 @@ import BannerCard from "./banner-card";
 import { getItem } from "@/utils/storage";
 import { StorageEnum } from "@/types/enum";
 import axios from "axios";
-import { Activity, HeartPulse, TrendingUp, User, Users } from "lucide-react";
+import {
+  Activity,
+  ArrowRightCircle,
+  HeartPulse,
+  TrendingUp,
+  User,
+  Users,
+} from "lucide-react";
 import { message, Tag } from "antd";
 import { useNavigate } from "react-router";
 
@@ -279,7 +286,19 @@ export default function Workbench() {
                 {users.map((user, index) => (
                   <tr key={index} className="table-row">
                     <td className="table-cell">{index + 1}</td>
-                    <td className="table-cell">{user.nickname}</td>
+                    <td className="table-cell">
+                      {" "}
+                      <p
+                        className="font-medium text-slate-900 dark:text-slate-50 truncate max-w-[120px]"
+                        title={user.nickname}
+                      >
+                        {user.nickname
+                          ? user.nickname.length > 10
+                            ? `${user.nickname.slice(0, 10)}...`
+                            : user.nickname
+                          : "-"}
+                      </p>
+                    </td>
                     <td className="table-cell">
                       <Tag color={levelColor(user.level)}>
                         {user.level || "Pending"}
@@ -291,11 +310,13 @@ export default function Workbench() {
                       </Tag>
                     </td>
                     <td className="table-cell">
-                      <button
-                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                      <ArrowRightCircle
+                        size={28}
+                        className="text-blue-500 cursor-pointer hover:text-blue-600 transition-transform hover:scale-110"
                         onClick={async () => {
                           const latest = await getLatestSession(user.userID);
                           console.log("Latest session:", latest);
+
                           if (latest?.sessionID) {
                             // Save in localStorage
                             localStorage.setItem(
@@ -310,9 +331,7 @@ export default function Workbench() {
                             message.info("No session available for this user.");
                           }
                         }}
-                      >
-                        View Progress
-                      </button>
+                      />
                     </td>
                   </tr>
                 ))}
