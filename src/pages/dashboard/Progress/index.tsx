@@ -178,7 +178,6 @@ const PHQStepsChart: React.FC = () => {
               description={
                 e ? (
                   <>
-                    <Text>{e.phq9_question}</Text>
                     <Text
                       type="secondary"
                       style={{ display: "block", marginTop: 4 }}
