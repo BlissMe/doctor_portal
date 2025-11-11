@@ -8,6 +8,7 @@ import { StorageEnum } from "@/types/enum";
 import axios from "axios";
 import { Activity, HeartPulse, TrendingUp, User, Users } from "lucide-react";
 import { message, Tag } from "antd";
+import { useNavigate } from "react-router";
 
 interface User {
   userID: number;
@@ -56,6 +57,7 @@ export default function Workbench() {
     };
     loadData();
   }, [apiBase]);
+  const navigate = useNavigate();
 
   const fetchAllUsers = async () => {
     setLoading(true);
@@ -155,6 +157,21 @@ export default function Workbench() {
   const minimalPatients = users.filter(
     (u) => u.level?.toLowerCase() === "minimal"
   ).length;
+  const getLatestSession = async (userID: number) => {
+    try {
+      const response = await axios.get<{ sessionID: string | null }>(
+        `${apiBase}/session/latest-session`,
+        {
+          params: { userID }, // ✅ pass userID here
+        }
+      );
+      console.log(response);
+      return response.data;
+    } catch (err) {
+      console.error(`Error fetching latest session for user ${userID}:`, err);
+      return { sessionID: null };
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -255,73 +272,47 @@ export default function Workbench() {
                   <th className="table-head">Nickname</th>
                   <th className="table-head">System Assessment</th>
                   <th className="table-head">Self Assessment</th>
+                  <th className="table-head">Tracker</th>
                 </tr>
               </thead>
               <tbody className="table-body">
                 {users.map((user, index) => (
                   <tr key={index} className="table-row">
                     <td className="table-cell">{index + 1}</td>
+                    <td className="table-cell">{user.nickname}</td>
                     <td className="table-cell">
-                      <div className="flex flex-col">
-                        <p
-                          className="font-medium text-slate-900 dark:text-slate-50 truncate max-w-[120px]"
-                          title={user.nickname}
-                        >
-                          {user.nickname.length > 10
-                            ? `${user.nickname.slice(0, 10)}...`
-                            : user.nickname}
-                        </p>
-                      </div>
+                      <Tag color={levelColor(user.level)}>
+                        {user.level || "Pending"}
+                      </Tag>
                     </td>
-
-                    <td className="table-cell text-white">
-                      <div className="flex flex-col text-white">
-                        {user.R_value && user.R_value > 0 ? (
-                          <>
-                            <div className="flex items-center gap-x-4">
-                              <Tag
-                                color={levelColor(user.level)}
-                                style={{
-                                  fontSize: "14px",
-                                  height: "32px",
-                                  lineHeight: "32px",
-                                  padding: "0 12px",
-                                }}
-                              >
-                                {user.level}
-                              </Tag>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-x-4">
-                            <Tag
-                              color={levelColor("pending")}
-                              style={{
-                                fontSize: "14px",
-                                height: "32px",
-                                lineHeight: "32px",
-                                padding: "0 12px",
-                              }}
-                            >
-                              Pending
-                            </Tag>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-
                     <td className="table-cell">
-                      <Tag
-                        color={levelColor(user.depressionLevel)}
-                        style={{
-                          fontSize: "14px",
-                          height: "32px",
-                          lineHeight: "32px",
-                          padding: "0 12px",
-                        }}
-                      >
+                      <Tag color={levelColor(user.depressionLevel)}>
                         {user.depressionLevel || "-"}
                       </Tag>
+                    </td>
+                    <td className="table-cell">
+                      <button
+                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                        onClick={async () => {
+                          const latest = await getLatestSession(user.userID);
+                          console.log("Latest session:", latest);
+                          if (latest?.sessionID) {
+                            // Save in localStorage
+                            localStorage.setItem(
+                              "phqStepData",
+                              JSON.stringify({
+                                userId: user.userID,
+                                sessionId: latest.sessionID,
+                              })
+                            );
+                            navigate("/tracker");
+                          } else {
+                            message.info("No session available for this user.");
+                          }
+                        }}
+                      >
+                        View Progress
+                      </button>
                     </td>
                   </tr>
                 ))}
