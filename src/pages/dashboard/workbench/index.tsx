@@ -352,9 +352,6 @@ export default function Workbench() {
                     <td className="table-cell">{index + 1}</td>
                     <td className="table-cell">
                       <div className="flex flex-col">
-                        <p className="font-medium text-slate-900 dark:text-slate-50">
-                          {user.nickname}
-                        </p>
                         <p
                           className="font-medium text-slate-900 dark:text-slate-50 truncate max-w-[120px]"
                           title={user.nickname}
