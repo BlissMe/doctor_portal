@@ -6,8 +6,23 @@ import BannerCard from "./banner-card";
 import { getItem } from "@/utils/storage";
 import { StorageEnum } from "@/types/enum";
 import axios from "axios";
-import { Activity, HeartPulse, TrendingUp, User, Users } from "lucide-react";
+import {
+  Activity,
+  ArrowRightCircle,
+  HeartPulse,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { message, Tag } from "antd";
+import { useNavigate } from "react-router";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 interface User {
   userID: number;
@@ -49,6 +64,7 @@ export default function Workbench() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const apiBase = import.meta.env.VITE_APP_API_BASE_URL2;
+
   useEffect(() => {
     const loadData = async () => {
       await fetchAllUsers();
@@ -56,6 +72,7 @@ export default function Workbench() {
     };
     loadData();
   }, [apiBase]);
+  const navigate = useNavigate();
 
   const fetchAllUsers = async () => {
     setLoading(true);
@@ -141,10 +158,22 @@ export default function Workbench() {
       );
     } catch (error: any) {
       console.error("Error fetching levels:", error?.message || error);
-      // not fatal, continue
     }
   };
 
+  const getLatestSession = async (userID: number) => {
+    try {
+      const response = await axios.get<{ sessionID: string | null }>(
+        `${apiBase}/session/latest-session`,
+        { params: { userID } }
+      );
+      return response.data;
+    } catch {
+      return { sessionID: null };
+    }
+  };
+
+  // Compute patient counts
   const totalPatients = users.length;
   const severePatients = users.filter(
     (u) => u.level?.toLowerCase() === "severe"
@@ -156,9 +185,68 @@ export default function Workbench() {
     (u) => u.level?.toLowerCase() === "minimal"
   ).length;
 
+
+  const sortedUsers = [...users].sort((a, b) => {
+    const getStatus = (user: User) => {
+      const selfLevelRaw = user.depressionLevel?.toLowerCase() || "unknown";
+      const selfLevel =
+        selfLevelRaw === "mild"
+          ? "minimal"
+          : ["unknown", "no idea"].includes(selfLevelRaw)
+          ? "unknown"
+          : selfLevelRaw;
+
+      let systemLevel = user.level?.toLowerCase() || "pending";
+      if (systemLevel === "pending") systemLevel = "unknown"; // treat pending as unknown
+
+      if (selfLevel === "unknown") return 2;
+      return selfLevel === systemLevel ? 0 : 1;
+    };
+    return getStatus(a) - getStatus(b);
+  });
+
+  const comparisonCounts = sortedUsers.reduce(
+    (acc, user) => {
+      const selfLevelRaw = user.depressionLevel?.toLowerCase() || "unknown";
+      const selfLevel =
+        selfLevelRaw === "mild"
+          ? "minimal"
+          : ["unknown", "no idea"].includes(selfLevelRaw)
+          ? "unknown"
+          : selfLevelRaw;
+
+      let systemLevel = user.level?.toLowerCase() || "pending";
+      if (systemLevel === "pending") systemLevel = "unknown"; // treat pending as unknown
+
+      if (selfLevel === "unknown" || systemLevel === "unknown")
+        acc.Unknown += 1;
+      else if (selfLevel === systemLevel) acc.Match += 1;
+      else acc.Mismatch += 1;
+
+      return acc;
+    },
+    { Match: 0, Mismatch: 0, Unknown: 0 }
+  );
+
+  const accuracy =
+    comparisonCounts.Match + comparisonCounts.Mismatch > 0
+      ? (comparisonCounts.Match /
+          (comparisonCounts.Match + comparisonCounts.Mismatch)) *
+        100
+      : 0;
+
+  const chartData = [
+    { name: "Match", value: comparisonCounts.Match },
+    { name: "Mismatch", value: comparisonCounts.Mismatch },
+    { name: "Unknown", value: comparisonCounts.Unknown },
+  ];
+
+  const COLORS = ["#10b981", "#ef4444", "#3b82f6"];
+
   return (
     <div className="flex flex-col gap-4 w-full">
       <BannerCard />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="flex flex-col justify-between h-full">
           <CardContent className="flex flex-col gap-2 p-4">
@@ -245,6 +333,76 @@ export default function Workbench() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="flex flex-col p-4">
+          <Title as="h4" className="mb-2 font-semibold">
+            Comparison Status
+          </Title>
+          <div className="w-full h-90 border border-white">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  innerRadius={60}
+                  label
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="flex flex-col p-4">
+          <Title as="h4" className="mb-2 font-semibold">
+            Accuracy
+          </Title>
+          <div className="w-full h-90 border border-white">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: "Match", value: comparisonCounts.Match },
+                    { name: "Mismatch", value: comparisonCounts.Mismatch },
+                  ]}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  innerRadius={60}
+                  label
+                >
+                  <Cell fill="#10b981" />
+                  <Cell fill="#ef4444" />
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-col items-center mt-4">
+            <p className="text-3xl font-bold text-green-600">
+              {accuracy.toFixed(2)}%
+            </p>
+            <p className="mt-2 text-gray-600">Match / (Match + Mismatch)</p>
+          </div>
+        </Card>
+      </div>
+
+      {/* Users Table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-3 flex flex-col p-6">
           <div className="relative h-[500px] w-full flex-shrink-0 overflow-auto rounded-none [scrollbar-width:_thin]">
@@ -255,76 +413,94 @@ export default function Workbench() {
                   <th className="table-head">Nickname</th>
                   <th className="table-head">System Assessment</th>
                   <th className="table-head">Self Assessment</th>
+                  <th className="table-head">Comparison</th>
+                  <th className="table-head">Tracker</th>
                 </tr>
               </thead>
               <tbody className="table-body">
-                {users.map((user, index) => (
-                  <tr key={index} className="table-row">
-                    <td className="table-cell">{index + 1}</td>
-                    <td className="table-cell">
-                      <div className="flex flex-col">
+                {sortedUsers.map((user, index) => {
+                  const selfLevelRaw =
+                    user.depressionLevel?.toLowerCase() || "unknown";
+                  const selfLevel =
+                    selfLevelRaw === "mild"
+                      ? "minimal"
+                      : ["unknown", "no idea"].includes(selfLevelRaw)
+                      ? "unknown"
+                      : selfLevelRaw;
+
+                  const systemLevel = user.level?.toLowerCase() || "pending";
+
+                  let comparisonStatus = "";
+                  if (selfLevel === "unknown") comparisonStatus = "Unknown";
+                  else if (selfLevel === systemLevel)
+                    comparisonStatus = "Match";
+                  else comparisonStatus = "Mismatch";
+
+                  return (
+                    <tr key={index} className="table-row">
+                      <td className="table-cell">{index + 1}</td>
+                      <td className="table-cell">
                         <p
                           className="font-medium text-slate-900 dark:text-slate-50 truncate max-w-[120px]"
                           title={user.nickname}
                         >
-                          {user.nickname.length > 10
-                            ? `${user.nickname.slice(0, 10)}...`
-                            : user.nickname}
+                          {user.nickname
+                            ? user.nickname.length > 10
+                              ? `${user.nickname.slice(0, 10)}...`
+                              : user.nickname
+                            : "-"}
                         </p>
-                      </div>
-                    </td>
-
-                    <td className="table-cell text-white">
-                      <div className="flex flex-col text-white">
-                        {user.R_value && user.R_value > 0 ? (
-                          <>
-                            <div className="flex items-center gap-x-4">
-                              <Tag
-                                color={levelColor(user.level)}
-                                style={{
-                                  fontSize: "14px",
-                                  height: "32px",
-                                  lineHeight: "32px",
-                                  padding: "0 12px",
-                                }}
-                              >
-                                {user.level}
-                              </Tag>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-x-4">
-                            <Tag
-                              color={levelColor("pending")}
-                              style={{
-                                fontSize: "14px",
-                                height: "32px",
-                                lineHeight: "32px",
-                                padding: "0 12px",
-                              }}
-                            >
-                              Pending
-                            </Tag>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="table-cell">
-                      <Tag
-                        color={levelColor(user.depressionLevel)}
-                        style={{
-                          fontSize: "14px",
-                          height: "32px",
-                          lineHeight: "32px",
-                          padding: "0 12px",
-                        }}
-                      >
-                        {user.depressionLevel || "-"}
-                      </Tag>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="table-cell">
+                        <Tag color={levelColor(user.level)}>
+                          {user.level || "Pending"}
+                        </Tag>
+                      </td>
+                      <td className="table-cell">
+                        <Tag color={levelColor(selfLevel)}>
+                          {selfLevel.charAt(0).toUpperCase() +
+                            selfLevel.slice(1)}
+                        </Tag>
+                      </td>
+                      <td className="table-cell">
+                        <Tag
+                          color={
+                            comparisonStatus === "Match"
+                              ? "green"
+                              : comparisonStatus === "Mismatch"
+                              ? "red"
+                              : "blue"
+                          }
+                        >
+                          {comparisonStatus}
+                        </Tag>
+                      </td>
+                      <td className="table-cell">
+                        <ArrowRightCircle
+                          size={28}
+                          className="text-blue-500 cursor-pointer hover:text-blue-600 transition-transform hover:scale-110"
+                          onClick={async () => {
+                            const latest = await getLatestSession(user.userID);
+                            if (latest?.sessionID) {
+                              localStorage.setItem(
+                                "phqStepData",
+                                JSON.stringify({
+                                  userId: user.userID,
+                                  sessionId: latest.sessionID,
+                                })
+                              );
+                              navigate("/tracker");
+                            } else {
+                              message.info(
+                                "No session available for this user."
+                              );
+                            }
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

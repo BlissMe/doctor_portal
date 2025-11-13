@@ -339,7 +339,7 @@ export default function Workbench() {
               <thead className="table-header">
                 <tr className="table-row">
                   <th className="table-head">#</th>
-                   <th className="table-head">Nickname</th>
+                  <th className="table-head">Nickname</th>
                   <th className="table-head">System Assessment</th>
                   <th className="table-head">Manage Assessment</th>
                   <th className="table-head">Assessment Notes</th>
@@ -352,8 +352,15 @@ export default function Workbench() {
                     <td className="table-cell">{index + 1}</td>
                     <td className="table-cell">
                       <div className="flex flex-col">
-                        <p className="font-medium text-slate-900 dark:text-slate-50">
-                          {user.nickname}
+                        <p
+                          className="font-medium text-slate-900 dark:text-slate-50 truncate max-w-[120px]"
+                          title={user.nickname}
+                        >
+                          {user.nickname
+                            ? user.nickname.length > 10
+                              ? `${user.nickname.slice(0, 10)}...`
+                              : user.nickname
+                            : "-"}
                         </p>
                       </div>
                     </td>
@@ -404,7 +411,19 @@ export default function Workbench() {
                         <Icon icon="mdi:plus" size={18} /> Add Comment
                       </Button>
                     </td>
-                    <td className="table-cell">{user.doctorComment || "-"}</td>
+                    <td className="table-cell">
+                      <p
+                        className="font-medium text-slate-900 dark:text-slate-50 truncate max-w-[120px]"
+                        title={user.doctorComment}
+                      >
+                        {user.doctorComment
+                          ? user.doctorComment.length > 10
+                            ? `${user.doctorComment.slice(0, 10)}...`
+                            : user.doctorComment
+                          : "-"}
+                      </p>
+                    </td>
+
                     <td className="table-cell">
                       <Tag
                         color={levelColor(user.doctorLevel)}
