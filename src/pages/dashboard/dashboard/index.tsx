@@ -128,7 +128,11 @@ export default function Workbench() {
               lastSessionID: last.data.sessionID,
             } as User;
           } catch (err) {
-            console.error("Error fetching PHQ9 session for user", ld.userID, err);
+            console.error(
+              "Error fetching PHQ9 session for user",
+              ld.userID,
+              err
+            );
           }
           return { ...ld, level: ld.level || "pending" } as User;
         })
@@ -186,7 +190,15 @@ export default function Workbench() {
       if (self === sys) return 0;
       return 1;
     };
-    return statusRank(a) - statusRank(b) || (a.nickname || "").localeCompare(b.nickname || "");
+
+    const rankA = statusRank(a);
+    const rankB = statusRank(b);
+
+    // First compare Match → Mismatch → Unknown
+    if (rankA !== rankB) return rankA - rankB;
+
+    // If same group → sort by userID
+    return a.userID - b.userID;
   });
 
   const comparisonCounts = sortedUsers.reduce(
@@ -195,7 +207,8 @@ export default function Workbench() {
       let systemLevel = user.level?.toLowerCase() || "pending";
       if (systemLevel === "pending") systemLevel = "unknown";
 
-      if (selfLevel === "unknown" || systemLevel === "unknown") acc.Unknown += 1;
+      if (selfLevel === "unknown" || systemLevel === "unknown")
+        acc.Unknown += 1;
       else if (selfLevel === systemLevel) acc.Match += 1;
       else acc.Mismatch += 1;
 
@@ -224,9 +237,15 @@ export default function Workbench() {
   );
 
   const totalPatients = users.length;
-  const severePatients = users.filter((u) => u.level?.toLowerCase() === "severe").length;
-  const moderatePatients = users.filter((u) => u.level?.toLowerCase() === "moderate").length;
-  const minimalPatients = users.filter((u) => u.level?.toLowerCase() === "minimal").length;
+  const severePatients = users.filter(
+    (u) => u.level?.toLowerCase() === "severe"
+  ).length;
+  const moderatePatients = users.filter(
+    (u) => u.level?.toLowerCase() === "moderate"
+  ).length;
+  const minimalPatients = users.filter(
+    (u) => u.level?.toLowerCase() === "minimal"
+  ).length;
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -235,10 +254,30 @@ export default function Workbench() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { title: "Total Patients", value: totalPatients, icon: Users, color: "#7c3aed" },
-          { title: "Severe Cases", value: severePatients, icon: HeartPulse, color: "#ef4444" },
-          { title: "Moderate Cases", value: moderatePatients, icon: Activity, color: "#f59e0b" },
-          { title: "Minimal Cases", value: minimalPatients, icon: TrendingUp, color: "#10b981" },
+          {
+            title: "Total Patients",
+            value: totalPatients,
+            icon: Users,
+            color: "#7c3aed",
+          },
+          {
+            title: "Severe Cases",
+            value: severePatients,
+            icon: HeartPulse,
+            color: "#ef4444",
+          },
+          {
+            title: "Moderate Cases",
+            value: moderatePatients,
+            icon: Activity,
+            color: "#f59e0b",
+          },
+          {
+            title: "Minimal Cases",
+            value: minimalPatients,
+            icon: TrendingUp,
+            color: "#10b981",
+          },
         ].map((card, i) => (
           <Card key={i} className="flex flex-col justify-between h-full">
             <CardContent className="flex flex-col gap-2 p-4">
@@ -249,10 +288,14 @@ export default function Workbench() {
                 >
                   <card.icon size={24} className={`text-[${card.color}]`} />
                 </div>
-                <Text variant="body2" className="font-semibold">{card.title}</Text>
+                <Text variant="body2" className="font-semibold">
+                  {card.title}
+                </Text>
               </div>
               <div className="mt-2">
-                <Title as="h3" className="text-2xl font-bold">{card.value}</Title>
+                <Title as="h3" className="text-2xl font-bold">
+                  {card.value}
+                </Title>
               </div>
             </CardContent>
           </Card>
@@ -262,7 +305,9 @@ export default function Workbench() {
       {/* Comparison and Accuracy Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="flex flex-col p-4">
-          <Title as="h4" className="mb-2 font-semibold">Comparison Status</Title>
+          <Title as="h4" className="mb-2 font-semibold">
+            Comparison Status
+          </Title>
           <div className="w-full h-90 border border-white">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -277,7 +322,10 @@ export default function Workbench() {
                   label
                 >
                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -288,7 +336,9 @@ export default function Workbench() {
         </Card>
 
         <Card className="flex flex-col p-4">
-          <Title as="h4" className="mb-2 font-semibold">Accuracy</Title>
+          <Title as="h4" className="mb-2 font-semibold">
+            Accuracy
+          </Title>
           <div className="w-full h-90 border border-white">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -314,7 +364,9 @@ export default function Workbench() {
             </ResponsiveContainer>
           </div>
           <div className="flex flex-col items-center mt-4">
-            <p className="text-3xl font-bold text-green-600">{accuracy.toFixed(2)}%</p>
+            <p className="text-3xl font-bold text-green-600">
+              {accuracy.toFixed(2)}%
+            </p>
             <p className="mt-2 text-gray-600">Match / (Match + Mismatch)</p>
           </div>
         </Card>
@@ -329,6 +381,7 @@ export default function Workbench() {
                 <tr className="table-row">
                   <th className="table-head">#</th>
                   <th className="table-head">Nickname</th>
+                  <th className="table-head">UserID</th>
                   <th className="table-head">System Assessment</th>
                   <th className="table-head">Self Assessment</th>
                   <th className="table-head">Comparison</th>
@@ -342,7 +395,8 @@ export default function Workbench() {
 
                   let comparisonStatus = "";
                   if (selfLevel === "unknown") comparisonStatus = "Unknown";
-                  else if (selfLevel === systemLevel) comparisonStatus = "Match";
+                  else if (selfLevel === systemLevel)
+                    comparisonStatus = "Match";
                   else comparisonStatus = "Mismatch";
 
                   return (
@@ -358,12 +412,16 @@ export default function Workbench() {
                             : user.nickname || "-"}
                         </p>
                       </td>
+                      <td className="table-cell">{user.userID}</td>
                       <td className="table-cell">
-                        <Tag color={levelColor(user.level)}>{user.level || "Pending"}</Tag>
+                        <Tag color={levelColor(user.level)}>
+                          {user.level || "Pending"}
+                        </Tag>
                       </td>
                       <td className="table-cell">
                         <Tag color={levelColor(selfLevel)}>
-                          {selfLevel.charAt(0).toUpperCase() + selfLevel.slice(1)}
+                          {selfLevel.charAt(0).toUpperCase() +
+                            selfLevel.slice(1)}
                         </Tag>
                       </td>
                       <td className="table-cell">
@@ -395,7 +453,9 @@ export default function Workbench() {
                               );
                               navigate("/tracker");
                             } else {
-                              message.info("No session available for this user.");
+                              message.info(
+                                "No session available for this user."
+                              );
                             }
                           }}
                         />
