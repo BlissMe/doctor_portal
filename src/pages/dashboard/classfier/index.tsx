@@ -57,7 +57,7 @@ const PHQStepsChart: React.FC = () => {
     if (!userId || !sessionId) return;
 
     const fetchEvents = async () => {
-      setLoading(true);
+      setLoading(true); 
       try {
         const res = await axios.get<SessionLog>(
           `http://localhost:8000/monitor-agent/get-session-events?user_id=${userId}&session_id=${sessionId}`
@@ -76,7 +76,7 @@ const PHQStepsChart: React.FC = () => {
       } catch (err) {
         console.error("Failed to fetch session events:", err);
       } finally {
-        setLoading(false);
+        setLoading(false); 
       }
     };
 
@@ -178,20 +178,21 @@ const PHQStepsChart: React.FC = () => {
               description={
                 e ? (
                   <>
-                    <Text
-                      type="secondary"
-                      style={{ display: "block", marginTop: 4 }}
-                    >
-                      {new Date(e.timestamp + "Z").toLocaleString("en-GB", {
-                        timeZone: "Asia/Colombo",
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                      })}
-                    </Text>
+ <Text
+  type="secondary"
+  style={{ display: "block", marginTop: 4 }}
+>
+  {new Date(e.timestamp).toLocaleString("en-GB", {
+    timeZone: "Asia/Colombo",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false, 
+  })}
+</Text>
+
                   </>
                 ) : null
               }

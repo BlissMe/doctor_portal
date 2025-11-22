@@ -8,6 +8,8 @@ export function getFrontendDashboardRoutes(): RouteObject[] {
     { path: "dashboard", element: Component("/pages/dashboard/dashboard") },
     { path: "analysis", element: Component("/pages/dashboard/analysis") },
     { path: "tracker", element: Component("/pages/dashboard/Progress") },
+    { path: "classifer", element: Component("/pages/dashboard/classifer") },
+
 
     {
       path: "components",

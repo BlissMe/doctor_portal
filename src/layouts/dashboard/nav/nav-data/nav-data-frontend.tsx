@@ -20,6 +20,11 @@ export const frontendNavData: NavProps["data"] = [
 				path: "/analysis",
 				icon: <Icon icon="local:ic-analysis" size="24" />,
 			},
+			{
+				title: "Classifer",
+				path: "/classifer",
+				icon: <Icon icon="local:ic-analysis" size="24" />,
+			},
 		],
 	},
 	

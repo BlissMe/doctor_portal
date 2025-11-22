@@ -389,7 +389,7 @@ export default function Workbench() {
                 </tr>
               </thead>
               <tbody className="table-body">
-                {filteredUsersForTable.map((user, index) => {
+                {sortedUsers.map((user, index) => {
                   const selfLevel = normalizeLevel(user.depressionLevel);
                   const systemLevel = user.level?.toLowerCase() || "pending";
 
