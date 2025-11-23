@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Card, Typography, Spin, Steps, Drawer } from "antd";
+import React, { useEffect, useState, useRef } from "react";
+import { Card, Typography, Spin, Steps } from "antd";
 import { CheckCircleTwoTone, ClockCircleTwoTone } from "@ant-design/icons";
 import axios from "axios";
 
@@ -46,6 +46,9 @@ const agents: Agent[] = [
   { name: "Therapy Agent", key: "therapy" },
 ];
 
+const DRAWER_WIDTH = 500;
+const CARD_HEIGHT = 320;
+
 const WorkflowPipeline: React.FC = () => {
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [agentEvents, setAgentEvents] = useState<
@@ -57,21 +60,10 @@ const WorkflowPipeline: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerAgent, setDrawerAgent] = useState<string | null>(null);
-// Inside WorkflowPipeline component
-
-const [overflowAgents, setOverflowAgents] = useState<Record<string, boolean>>({});
-
-useEffect(() => {
-  // After events are loaded, check which agent cards overflow
-  const newOverflow: Record<string, boolean> = {};
-  agents.forEach((agent) => {
-    const el = document.getElementById(`scroll-${agent.key}`);
-    if (el) {
-      newOverflow[agent.key] = el.scrollHeight > el.clientHeight;
-    }
-  });
-  setOverflowAgents(newOverflow);
-}, [events]);
+  const [overflowAgents, setOverflowAgents] = useState<Record<string, boolean>>(
+    {}
+  );
+  const stepsRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const agentMapping: Record<string, string> = {
     chat: "assessment",
@@ -88,6 +80,7 @@ useEffect(() => {
     }
   }, []);
 
+  // Fetch session events
   useEffect(() => {
     if (!userId || !sessionId) return;
 
@@ -107,17 +100,6 @@ useEffect(() => {
           grouped[agentKey].push(e);
         });
         setAgentEvents(grouped);
-
-        for (const agent of agents) {
-          const steps = getAgentSteps(agent.key, grouped);
-          const activeStepIndex = steps.findIndex(
-            (s) => getStepStatus(s, agent.key, grouped) === "process"
-          );
-          if (activeStepIndex !== -1) {
-            setSelectedAgent(agent.key);
-            break;
-          }
-        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -127,6 +109,24 @@ useEffect(() => {
 
     fetchEvents();
   }, [userId, sessionId]);
+
+  // Check for overflow
+  useEffect(() => {
+    const checkOverflow = () => {
+      const newOverflow: Record<string, boolean> = {};
+      agents.forEach((agent) => {
+        const el = stepsRefs.current[agent.key];
+        if (el) {
+          newOverflow[agent.key] = el.scrollHeight > el.clientHeight;
+        }
+      });
+      setOverflowAgents(newOverflow);
+    };
+
+    checkOverflow();
+    window.addEventListener("resize", checkOverflow);
+    return () => window.removeEventListener("resize", checkOverflow);
+  }, [agentEvents]);
 
   if (!userId || !sessionId) return <div>No session selected.</div>;
   if (loading)
@@ -200,162 +200,187 @@ useEffect(() => {
     setDrawerOpen(true);
   };
 
-  const CARD_HEIGHT = 400;
-
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 20,
-        padding: 20,
-        overflowX: "auto",
-      }}
-    >
-      {agents.map((agent, idx) => {
-        const steps = getAgentSteps(agent.key);
-        const activeStepIndex = steps.findIndex(
-          (s) => getStepStatus(s, agent.key) === "process"
-        );
-        const isCurrent = selectedAgent === agent.key;
-        const agentActive = isAgentActive(agent.key);
+    <div style={{ display: "flex", width: "100%", gap: 20 }}>
+      <div
+        style={{
+          flex: "1",
+          display: "flex",
+          flexDirection: "column",
+          gap: 40,
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            width: 2,
+            background: "#d9d9d9",
+            height: "100%",
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            transform: "translateX(-50%)",
+          }}
+        />
 
-        return (
-          <div
-            key={agent.key}
-            style={{ display: "flex", alignItems: "center" }}
-          >
-            <Card
-              title={
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {agentActive ? (
-                    <ClockCircleTwoTone twoToneColor="#52c41a" />
-                  ) : (
-                    <CheckCircleTwoTone twoToneColor="#d9d9d9" />
-                  )}
-                  <span>{agent.name}</span>
-                </div>
-              }
-              bordered
+        {agents.map((agent, idx) => {
+          const steps = getAgentSteps(agent.key);
+          const activeStepIndex = steps.findIndex(
+            (s) => getStepStatus(s, agent.key) === "process"
+          );
+          const isLeft = idx % 2 === 0;
+          const agentActive = isAgentActive(agent.key);
+
+          return (
+            <div
+              key={agent.key}
               style={{
-                borderColor: isCurrent ? "#1890ff" : undefined,
-                borderWidth: isCurrent ? 2 : 1,
-                width: 250,
-                height: CARD_HEIGHT,
+                width: "100%",
                 display: "flex",
-                flexDirection: "column",
+                justifyContent: isLeft ? "flex-start" : "flex-end",
+                alignItems: "center",
                 position: "relative",
+                gap: 20,
               }}
             >
-              <div
-                id={`scroll-${agent.key}`}
+              <Card
+                title={
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    {agentActive ? (
+                      <ClockCircleTwoTone twoToneColor="#52c41a" />
+                    ) : (
+                      <CheckCircleTwoTone twoToneColor="#d9d9d9" />
+                    )}
+                    <span>{agent.name}</span>
+                  </div>
+                }
+                bordered
                 style={{
-                  maxHeight: CARD_HEIGHT - 120,
-                  overflow: "hidden",
-                  flex: 1,
-                  paddingRight: 5,
+                  width: 300,
+                  height: CARD_HEIGHT,
+                  borderColor:
+                    selectedAgent === agent.key ? "#1890ff" : undefined,
+                  borderWidth: selectedAgent === agent.key ? 2 : 1,
                 }}
               >
-                <Steps
-                  direction="vertical"
-                  current={
-                    activeStepIndex !== -1 ? activeStepIndex : steps.length - 1
-                  }
+                <div
+                  style={{
+                    maxHeight: CARD_HEIGHT - 120,
+                    overflow: "hidden",
+                  }}
+                  ref={(el) => void (stepsRefs.current[agent.key] = el)}
                 >
-                  {steps.map((step, sIdx) => (
-                    <Step
-                      key={sIdx}
-                      title={step.title}
-                      status={getStepStatus(step, agent.key)}
-                      description={
-                        isPHQStep(step) ? (
-                          <Text type="secondary">
-                            {new Date(
-                              step.phqEvent.timestamp + "Z"
-                            ).toLocaleString("en-GB", {
-                              timeZone: "Asia/Colombo",
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              hour12: false,
-                            })}
-                          </Text>
-                        ) : step.output_data ? (
-                          <Text>
-                            {step.output_data.depression_label ??
-                              step.output_data.emotion}
-                          </Text>
-                        ) : null
-                      }
-                    />
-                  ))}
-                </Steps>
-              </div>
+                  <Steps
+                    direction="vertical"
+                    current={
+                      activeStepIndex !== -1
+                        ? activeStepIndex
+                        : steps.length - 1
+                    }
+                  >
+                    {steps.map((step, sIdx) => (
+                      <Step
+                        key={sIdx}
+                        title={step.title}
+                        status={getStepStatus(step, agent.key)}
+                        description={
+                          isPHQStep(step) ? (
+                            <Text type="secondary">
+                              {new Date(
+                                step.phqEvent.timestamp + "Z"
+                              ).toLocaleString("en-GB", {
+                                timeZone: "Asia/Colombo",
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: false,
+                              })}{" "}
+                            </Text>
+                          ) : step.output_data ? (
+                            <Text>
+                              {step.output_data.depression_label ??
+                                step.output_data.emotion}
+                            </Text>
+                          ) : null
+                        }
+                      />
+                    ))}
+                  </Steps>
+                </div>
 
-             {overflowAgents[agent.key] && (
-  <div
-    style={{
-      textAlign: "center",
-      marginTop: 5,
-      cursor: "pointer",
-      fontSize: 12,
-      color: "#1890ff",
-    }}
-    onClick={() => openDrawerForAgent(agent.key)}
-  >
-    View All
-  </div>
-)}
+                {overflowAgents[agent.key] && (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      marginTop: 5,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: "#1890ff",
+                    }}
+                    onClick={() => openDrawerForAgent(agent.key)}
+                  >
+                    View All
+                  </div>
+                )}
+              </Card>
+            </div>
+          );
+        })}
+      </div>
 
-            </Card>
-
-            {idx < agents.length - 1 && (
-              <div style={{ fontSize: 24, margin: "0 10px" }}>➡️</div>
-            )}
-          </div>
-        );
-      })}
-
-      <Drawer
-        title={
-          drawerAgent ? agents.find((a) => a.key === drawerAgent)?.name : ""
-        }
-        placement="right"
-        width={500}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      >
-        {drawerAgent && (
-          <Steps
-            direction="vertical"
-            current={getAgentSteps(drawerAgent).findIndex(
-              (s) => getStepStatus(s, drawerAgent) === "process"
-            )}
+      {drawerOpen && drawerAgent && (
+        <div
+          style={{
+            width: DRAWER_WIDTH,
+            borderLeft: "1px solid #d9d9d9",
+            paddingLeft: 16,
+            overflowY: "auto",
+          }}
+        >
+          <Card
+            title={agents.find((a) => a.key === drawerAgent)?.name}
+            size="small"
           >
-            {getAgentSteps(drawerAgent).map((step, sIdx) => (
-              <Step
-                key={sIdx}
-                title={step.title}
-                status={getStepStatus(step, drawerAgent)}
-                description={
-                  isPHQStep(step) ? (
-                    <Text type="secondary">
-                      {step.phqEvent.output_data?.phq9_question}
-                    </Text>
-                  ) : step.output_data ? (
-                    <Text>
-                      {step.output_data.depression_label ??
-                        step.output_data.emotion}
-                    </Text>
-                  ) : null
-                }
-              />
-            ))}
-          </Steps>
-        )}
-      </Drawer>
+            <Steps
+              direction="vertical"
+              current={getAgentSteps(drawerAgent).findIndex(
+                (s) => getStepStatus(s, drawerAgent) === "process"
+              )}
+            >
+              {getAgentSteps(drawerAgent).map((step, sIdx) => (
+                <Step
+                  key={sIdx}
+                  title={step.title}
+                  status={getStepStatus(step, drawerAgent)}
+                  description={
+                    isPHQStep(step)
+                      ? new Date(step.phqEvent.timestamp + "Z").toLocaleString(
+                          "en-GB",
+                          {
+                            timeZone: "Asia/Colombo",
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                          }
+                        )
+                      : step.output_data
+                      ? step.output_data.depression_label ??
+                        step.output_data.emotion
+                      : null
+                  }
+                />
+              ))}
+            </Steps>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
