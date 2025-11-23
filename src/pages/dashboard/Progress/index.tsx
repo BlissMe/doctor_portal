@@ -255,7 +255,15 @@ const WorkflowPipeline: React.FC = () => {
                       description={
                         isPHQStep(step) ? (
                           <Text type="secondary">
-                            {step.phqEvent.timestamp}
+                             {new Date(step.phqEvent.timestamp + "Z").toLocaleString("en-GB", {
+                        timeZone: "Asia/Colombo",
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })}
                           </Text>
                         ) : step.output_data ? (
                           <Text>
