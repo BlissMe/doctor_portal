@@ -63,7 +63,7 @@ const levelColor = (lvl?: string) => {
 export default function Workbench() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  const apiBase = import.meta.env.VITE_APP_API_BASE_URL3;
+  const apiBase = import.meta.env.VITE_APP_API_BASE_URL2;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -385,6 +385,7 @@ export default function Workbench() {
                   <th className="table-head">System Assessment</th>
                   <th className="table-head">Self Assessment</th>
                   <th className="table-head">Comparison</th>
+                  <th className="table-head">Tracker</th>
                 </tr>
               </thead>
               <tbody className="table-body">
@@ -436,7 +437,30 @@ export default function Workbench() {
                           {comparisonStatus}
                         </Tag>
                       </td>
-                     
+                      <td className="table-cell">
+                        <ArrowRightCircle
+                          size={28}
+                          className="text-blue-500 cursor-pointer hover:text-blue-600 transition-transform hover:scale-110"
+                          onClick={async () => {
+                            const latest = await getLatestSession(user.userID);
+                            if (latest?.sessionID) {
+                              localStorage.setItem(
+                                "phqStepData",
+                                JSON.stringify({
+                                  userId: user.userID,
+                                  sessionId: latest.sessionID,
+                                  nickname: user.nickname
+                                })
+                              );
+                              navigate("/tracker");
+                            } else {
+                              message.info(
+                                "No session available for this user."
+                              );
+                            }
+                          }}
+                        />
+                      </td>
                     </tr>
                   );
                 })}
