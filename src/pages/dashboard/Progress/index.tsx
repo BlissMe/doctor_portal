@@ -57,6 +57,21 @@ const WorkflowPipeline: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerAgent, setDrawerAgent] = useState<string | null>(null);
+// Inside WorkflowPipeline component
+
+const [overflowAgents, setOverflowAgents] = useState<Record<string, boolean>>({});
+
+useEffect(() => {
+  // After events are loaded, check which agent cards overflow
+  const newOverflow: Record<string, boolean> = {};
+  agents.forEach((agent) => {
+    const el = document.getElementById(`scroll-${agent.key}`);
+    if (el) {
+      newOverflow[agent.key] = el.scrollHeight > el.clientHeight;
+    }
+  });
+  setOverflowAgents(newOverflow);
+}, [events]);
 
   const agentMapping: Record<string, string> = {
     chat: "assessment",
@@ -235,8 +250,8 @@ const WorkflowPipeline: React.FC = () => {
               <div
                 id={`scroll-${agent.key}`}
                 style={{
-                  maxHeight: CARD_HEIGHT - 100, 
-                  overflow: "hidden", 
+                  maxHeight: CARD_HEIGHT - 120,
+                  overflow: "hidden",
                   flex: 1,
                   paddingRight: 5,
                 }}
@@ -255,15 +270,17 @@ const WorkflowPipeline: React.FC = () => {
                       description={
                         isPHQStep(step) ? (
                           <Text type="secondary">
-                             {new Date(step.phqEvent.timestamp + "Z").toLocaleString("en-GB", {
-                        timeZone: "Asia/Colombo",
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                      })}
+                            {new Date(
+                              step.phqEvent.timestamp + "Z"
+                            ).toLocaleString("en-GB", {
+                              timeZone: "Asia/Colombo",
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: false,
+                            })}
                           </Text>
                         ) : step.output_data ? (
                           <Text>
@@ -277,18 +294,21 @@ const WorkflowPipeline: React.FC = () => {
                 </Steps>
               </div>
 
-              <div
-                style={{
-                  textAlign: "center",
-                  marginTop: 5,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  color: "#1890ff",
-                }}
-                onClick={() => openDrawerForAgent(agent.key)}
-              >
-                View All
-              </div>
+             {overflowAgents[agent.key] && (
+  <div
+    style={{
+      textAlign: "center",
+      marginTop: 5,
+      cursor: "pointer",
+      fontSize: 12,
+      color: "#1890ff",
+    }}
+    onClick={() => openDrawerForAgent(agent.key)}
+  >
+    View All
+  </div>
+)}
+
             </Card>
 
             {idx < agents.length - 1 && (
