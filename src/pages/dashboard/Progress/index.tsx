@@ -32,6 +32,8 @@ interface StepBase {
   children?: StepData[];
   phqEvent?: SessionEvent;
   input_data?: Record<string, any>;
+  timestamp?: string;
+  status?: "wait" | "process" | "finish";
 }
 
 type StepData = StepBase;
@@ -134,31 +136,109 @@ const WorkflowPipeline: React.FC = () => {
 
         const children: StepData[] = phqEvents
           .sort((a, b) => (a.output_data?.phq9_questionID ?? a.phq9_questionID ?? 0) - (b.output_data?.phq9_questionID ?? b.phq9_questionID ?? 0))
-          .map((e) => ({ title: `PHQ Q${e.output_data?.phq9_questionID ?? e.phq9_questionID ?? -1}`, eventKey: `phq_q_${e.phq9_questionID}`, phqEvent: e }));
-
+          .map((e) => ({ title: `PHQ Q${e.output_data?.phq9_questionID ?? e.phq9_questionID ?? -1}`, eventKey: `phq_q_${e.phq9_questionID}`, phqEvent: e,  timestamp: e.timestamp }));
+        const firstEventTimestamp = evts[0]?.timestamp;   
         return [
-          { title: "Session Started", eventKey: "session_started" },
-          { title: "Initial Chat", eventKey: "initial" },
+          { title: "Session Started", eventKey: "session_started",timestamp: firstEventTimestamp  },
+          { title: "Initial Chat", eventKey: "initial",timestamp: evts[1]?.timestamp ?? firstEventTimestamp  },
           { title: completed ? "PHQ-9 Completed" : hasStarted ? "PHQ-9 In Progress" : "PHQ-9 Not Started", eventKey: "phq_main", children },
-          { title: "Follow-up", eventKey: "followup" },
-          { title: "Session Ended", eventKey: "session_ended" },
+          { title: "Follow-up", eventKey: "followup",    timestamp: evts.find(e => e.event === "followup")?.timestamp
+ },
         ];
       }
 
-      case "classifier":
-        return evts.map((e, idx) => ({ title: `Detection ${idx + 1}`, eventKey: `detection_${idx}`, output_data: e.output_data }));
+      case "classifier": {
+        const evts = grouped[agentKey] || [];
 
-      case "therapy":
-        return evts.map((e, idx) => ({ title: e.input_data?.event === "THERAPY_SUGGESTED" ? "Therapy Suggested" : `Therapy Step ${idx + 1}`, eventKey: `therapy_${idx}`, output_data: e.output_data, input_data: e.input_data }));
+        const sessionEvent = evts.find(
+          (e) => e.output_data?.event === "session_end"
+        );
+
+        const detectionEvent = evts.find(
+          (e) => e.output_data?.event === "depression_detection"
+        );
+
+        return [
+          {
+            title: "Session Ended",
+            eventKey: "session_ended",
+            timestamp: sessionEvent?.timestamp,   
+            output_data: undefined                
+          },
+          {
+            title: "Level Detection",
+            eventKey: "level_detection",
+            timestamp: detectionEvent?.timestamp,
+            output_data: detectionEvent?.output_data
+          }
+        ];
+      }
+
+      case "therapy": {
+        const evts = grouped[agentKey] || [];
+
+        const hasSuggested = evts.some(
+          (e) => (e.input_data?.event ?? e.event) === "THERAPY_SUGGESTED"
+        );
+        const hasStarted = evts.some(
+          (e) => (e.input_data?.event ?? e.event) === "THERAPY_STARTED"
+        );
+        const hasEnded = evts.some(
+          (e) => (e.input_data?.event ?? e.event) === "THERAPY_ENDED"
+        );
+
+        const inProgress = hasStarted && !hasEnded;
+        const eventObj = evts.find(
+          (e) =>
+            (e.input_data?.event ?? e.event) === "THERAPY_STARTED" ||
+            (e.input_data?.event ?? e.event) === "THERAPY_ENDED"
+        );
+
+        const therapyName = eventObj?.output_data?.therapy_name || "Therapy";
+
+        return [
+          {
+            title: "Therapy Suggested",
+            eventKey: "therapy_suggested",
+            status: hasSuggested ? "finish" : "wait",
+          },
+          {
+            title: hasStarted ? `${therapyName} Started` : `${therapyName} Not Started`,
+            eventKey: "therapy_started",
+            status: hasStarted ? "finish" : hasSuggested ? "process" : "wait",
+          },
+          {
+            title: hasEnded
+              ? `${therapyName} Completed`
+              : hasStarted
+                ? `${therapyName} In Progress`
+                : "Not Started",
+            eventKey: "therapy_progress",
+            status: inProgress ? "process" : hasEnded ? "finish" : "wait",
+          },
+          {
+            title: hasEnded ? `${therapyName} Completed` : "Not Completed",
+            eventKey: "therapy_completed",
+            status: hasEnded ? "finish" : "wait",
+          },
+        ];
+      }
 
       default: return [];
     }
   };
 
+
   const getStepStatus = (step: StepData, agentKey: string, grouped: Record<string, SessionEvent[]> = agentEvents) => {
     const evts = grouped[agentKey] || [];
     if (step.eventKey === "session_started" || step.eventKey === "initial") return "finish";
-    if (step.eventKey === "session_ended") return evts.some((e) => e.event?.toLowerCase() === "session_ended") ? "finish" : "wait";
+    if (step.eventKey === "session_ended") {
+      return evts.some(
+        (e) => e.output_data?.event === "session_end"
+      )
+        ? "finish"
+        : "wait";
+    }
     if (step.eventKey === "phq_main") {
       const phqEvents = evts.filter((e) => (e.output_data?.phq9_questionID !== undefined) || e.phq9_questionID !== undefined);
       if (!phqEvents.length) return "wait";
@@ -218,18 +298,28 @@ const WorkflowPipeline: React.FC = () => {
                   <div style={{ maxHeight: CARD_HEIGHT - 120, overflow: "hidden" }} ref={(el) => void (stepsRefs.current[agent.key] = el)}>
                     <Steps direction="vertical" current={activeStepIndex !== -1 ? activeStepIndex : steps.length - 1}>
                       {steps.map((step, sIdx) => (
-                        <Step key={sIdx} title={step.title} status={getStepStatus(step, agent.key)} description={step.output_data ? <Text>{step.output_data.depression_label ?? step.output_data.emotion ?? JSON.stringify(step.output_data)}</Text> : null} />
+                        <Step
+                          key={sIdx}
+                          title={step.title}
+                          status={getStepStatus(step, agent.key)}
+                          description={
+                            step.timestamp ? (
+                              <Text type="secondary">{formatTimestamp(step.timestamp)}</Text>
+                            ) : step.output_data ? (
+                              <Text>{step.output_data.depression_label ?? step.output_data.emotion ?? JSON.stringify(step.output_data)}</Text>
+                            ) : null
+                          }
+                        />
+
                       ))}
                     </Steps>
                   </div>
-                  {overflowAgents[agent.key] && <div style={{ textAlign: "center", marginTop: 5, cursor: "pointer", fontSize: 12, color: "#1890ff" }} onClick={() => openDrawerForAgent(agent.key)}>View All</div>}
+                  {agent.key === "assessment" && <div style={{ textAlign: "center", marginTop: 5, cursor: "pointer", fontSize: 12, color: "#1890ff" }} onClick={() => openDrawerForAgent(agent.key)}>View All</div>}
                 </Card>
               </div>
             );
           })}
         </div>
-
-        {/* Drawer */}
         {drawerOpen && drawerAgent && (
           <div style={{ width: DRAWER_WIDTH, borderLeft: "1px solid #d9d9d9", paddingLeft: 16, overflowY: "auto" }}>
             <Card
@@ -247,21 +337,24 @@ const WorkflowPipeline: React.FC = () => {
                         status={getStepStatus(step, drawerAgent)}
                         description={phqExpanded ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {step.children?.map((sub, subIdx) => {
-                              const ts = sub.phqEvent?.timestamp;
-                              const label = sub.phqEvent?.output_data?.phq9_question ?? sub.phqEvent?.phq9_question ?? sub.title;
-                              return (
-                                <div key={subIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 6 }}>
-                                  <div style={{ display: "flex", flexDirection: "column" }}>
-                                    <Text strong style={{ fontSize: 13 }}>{label}</Text>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>{ts ? formatTimestamp(ts) : ""}</Text>
+                            {step.children
+                              ?.filter((sub) => sub.phqEvent?.output_data?.phq9_started === true || sub.phqEvent?.phq9_started === true)
+                              .map((sub, subIdx) => {
+                                const ts = sub.phqEvent?.timestamp;
+                                const label = sub.phqEvent?.output_data?.phq9_questionID ?? sub.phqEvent?.phq9_questionID;
+                                return (
+                                  <div key={subIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 6 }}>
+                                    <div style={{ display: "flex", flexDirection: "column" }}>
+                                      <Text strong style={{ fontSize: 13 }}>{`PHQ-${label}`}</Text>
+                                      <Text type="secondary" style={{ fontSize: 12 }}>{ts ? formatTimestamp(ts) : ""}</Text>
+                                    </div>
+                                    <div>
+                                      {getStepStatus(sub, drawerAgent) === "finish" ? <CheckCircleTwoTone twoToneColor="#52c41a" /> : <ClockCircleTwoTone twoToneColor="#d9d9d9" />}
+                                    </div>
                                   </div>
-                                  <div>
-                                    {getStepStatus(sub, drawerAgent) === "finish" ? <CheckCircleTwoTone twoToneColor="#52c41a" /> : <ClockCircleTwoTone twoToneColor="#d9d9d9" />}
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+
                           </div>
                         ) : null}
                       />
@@ -273,8 +366,9 @@ const WorkflowPipeline: React.FC = () => {
                       key={sIdx}
                       title={step.title}
                       status={getStepStatus(step, drawerAgent)}
-                      description={step.output_data ? <Text>{step.output_data.depression_label ?? step.output_data.emotion ?? JSON.stringify(step.output_data)}</Text> : null}
-                    />
+                      description={step.output_data ? (
+                        <Text>{step.output_data.depression_label ?? step.output_data.emotion ?? JSON.stringify(step.output_data)}</Text>
+                      ) : null} />
                   );
                 })}
               </Steps>
