@@ -136,14 +136,15 @@ const WorkflowPipeline: React.FC = () => {
 
         const children: StepData[] = phqEvents
           .sort((a, b) => (a.output_data?.phq9_questionID ?? a.phq9_questionID ?? 0) - (b.output_data?.phq9_questionID ?? b.phq9_questionID ?? 0))
-          .map((e) => ({ title: `PHQ Q${e.output_data?.phq9_questionID ?? e.phq9_questionID ?? -1}`, eventKey: `phq_q_${e.phq9_questionID}`, phqEvent: e,  timestamp: e.timestamp }));
-        const firstEventTimestamp = evts[0]?.timestamp;   
+          .map((e) => ({ title: `PHQ Q${e.output_data?.phq9_questionID ?? e.phq9_questionID ?? -1}`, eventKey: `phq_q_${e.phq9_questionID}`, phqEvent: e, timestamp: e.timestamp }));
+        const firstEventTimestamp = evts[0]?.timestamp;
         return [
-          { title: "Session Started", eventKey: "session_started",timestamp: firstEventTimestamp  },
-          { title: "Initial Chat", eventKey: "initial",timestamp: evts[1]?.timestamp ?? firstEventTimestamp  },
+          { title: "Session Started", eventKey: "session_started", timestamp: firstEventTimestamp },
+          { title: "Initial Chat", eventKey: "initial", timestamp: evts[1]?.timestamp ?? firstEventTimestamp },
           { title: completed ? "PHQ-9 Completed" : hasStarted ? "PHQ-9 In Progress" : "PHQ-9 Not Started", eventKey: "phq_main", children },
-          { title: "Follow-up", eventKey: "followup",    timestamp: evts.find(e => e.event === "followup")?.timestamp
- },
+          {
+            title: "Follow-up", eventKey: "followup", timestamp: evts.find(e => e.event === "followup")?.timestamp
+          },
         ];
       }
 
@@ -162,8 +163,8 @@ const WorkflowPipeline: React.FC = () => {
           {
             title: "Session Ended",
             eventKey: "session_ended",
-            timestamp: sessionEvent?.timestamp,   
-            output_data: undefined                
+            timestamp: sessionEvent?.timestamp,
+            output_data: undefined
           },
           {
             title: "Level Detection",
@@ -175,54 +176,87 @@ const WorkflowPipeline: React.FC = () => {
       }
 
       case "therapy": {
-        const evts = grouped[agentKey] || [];
+        const evts = (grouped[agentKey] || [])
+          .filter(e => e.session_id === sessionId)
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-        const hasSuggested = evts.some(
-          (e) => (e.input_data?.event ?? e.event) === "THERAPY_SUGGESTED"
-        );
-        const hasStarted = evts.some(
-          (e) => (e.input_data?.event ?? e.event) === "THERAPY_STARTED"
-        );
-        const hasEnded = evts.some(
-          (e) => (e.input_data?.event ?? e.event) === "THERAPY_ENDED"
-        );
+        // Group therapy cycles by therapy_name
+        const therapyGroups: Record<string, SessionEvent[]> = {};
 
-        const inProgress = hasStarted && !hasEnded;
-        const eventObj = evts.find(
-          (e) =>
-            (e.input_data?.event ?? e.event) === "THERAPY_STARTED" ||
+        evts.forEach(e => {
+          const tname =
+            e.output_data?.therapy_name ||
+            e.input_data?.therapy_name ||
+            "Therapy";
+
+          if (!therapyGroups[tname]) therapyGroups[tname] = [];
+          therapyGroups[tname].push(e);
+        });
+
+        // Build steps dynamically for each therapy cycle
+        const allTherapySteps: StepData[] = [];
+
+        let therapyIndex = 1;
+        for (const [therapyName, tEvents] of Object.entries(therapyGroups)) {
+
+          const suggested = tEvents.find(e =>
+            (e.input_data?.event ?? e.event) === "THERAPY_SUGGESTED"
+          );
+          const started = tEvents.find(e =>
+            (e.input_data?.event ?? e.event) === "THERAPY_STARTED"
+          );
+          const inProgress = tEvents.filter(e =>
+            (e.input_data?.event ?? e.event) === "THERAPY_IN_PROGRESS"
+          );
+          const ended = tEvents.find(e =>
             (e.input_data?.event ?? e.event) === "THERAPY_ENDED"
-        );
+          );
+          console.log(started)
 
-        const therapyName = eventObj?.output_data?.therapy_name || "Therapy";
+          allTherapySteps.push({
+            title: `Therapy ${therapyIndex}: ${therapyName}`,
+            eventKey: `therapy_${therapyIndex}`,
+            children: [
+              {
+                title: "Suggested",
+                eventKey: `therapy_${therapyIndex}_suggested`,
+                timestamp: suggested?.timestamp,
+                status: suggested ? "finish" : "wait",
+              },
+              {
+                title: "Started",
+                eventKey: `therapy_${therapyIndex}_started`,
+                timestamp: started?.timestamp,
+                status: started ? "finish" : suggested ? "process" : "wait",
+              },
+              {
+                title: "Progress",
+                eventKey: `therapy_${therapyIndex}_progress`,
+                children: inProgress.map((p, i) => ({
+                  title: `Progress Update ${i + 1}`,
+                  eventKey: `therapy_${therapyIndex}_progress_${i}`,
+                  timestamp: p.timestamp,
+                  output_data: p.output_data,
+                })),
+                status: ended ? "finish" : started ? "process" : "wait",
+              },
+              {
+                title: "Completed",
+                eventKey: `therapy_${therapyIndex}_completed`,
+                timestamp: ended?.timestamp,
+                output_data: ended?.output_data,
+                status: ended ? "finish" : "wait",
+              }
+            ]
+          });
 
-        return [
-          {
-            title: "Therapy Suggested",
-            eventKey: "therapy_suggested",
-            status: hasSuggested ? "finish" : "wait",
-          },
-          {
-            title: hasStarted ? `${therapyName} Started` : `${therapyName} Not Started`,
-            eventKey: "therapy_started",
-            status: hasStarted ? "finish" : hasSuggested ? "process" : "wait",
-          },
-          {
-            title: hasEnded
-              ? `${therapyName} Completed`
-              : hasStarted
-                ? `${therapyName} In Progress`
-                : "Not Started",
-            eventKey: "therapy_progress",
-            status: inProgress ? "process" : hasEnded ? "finish" : "wait",
-          },
-          {
-            title: hasEnded ? `${therapyName} Completed` : "Not Completed",
-            eventKey: "therapy_completed",
-            status: hasEnded ? "finish" : "wait",
-          },
-        ];
+          therapyIndex++;
+        }
+
+        return allTherapySteps;
       }
+
+
 
       default: return [];
     }
@@ -303,18 +337,33 @@ const WorkflowPipeline: React.FC = () => {
                           title={step.title}
                           status={getStepStatus(step, agent.key)}
                           description={
-                            step.timestamp ? (
-                              <Text type="secondary">{formatTimestamp(step.timestamp)}</Text>
-                            ) : step.output_data ? (
-                              <Text>{step.output_data.depression_label ?? step.output_data.emotion ?? JSON.stringify(step.output_data)}</Text>
-                            ) : null
+                            <div>
+                              {step.timestamp && (
+                                <Text type="secondary">{formatTimestamp(step.timestamp)}</Text>
+                              )}
+
+                              {/* therapy child events (suggested, started, progress, ended) */}
+                              {step.children && (
+                                <div style={{ marginTop: 6, paddingLeft: 10 }}>
+                                  {step.children.map((child, cIdx) => (
+                                    <div key={cIdx} style={{ marginBottom: 5 }}>
+                                      <Text strong>{child.title}</Text>
+                                      <br />
+                                      {child.timestamp && (
+                                        <Text type="secondary">{formatTimestamp(child.timestamp)}</Text>
+                                      )}
+                                     
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           }
                         />
-
                       ))}
                     </Steps>
                   </div>
-                  {agent.key === "assessment" && <div style={{ textAlign: "center", marginTop: 5, cursor: "pointer", fontSize: 12, color: "#1890ff" }} onClick={() => openDrawerForAgent(agent.key)}>View All</div>}
+                  {(agent.key === "assessment" || agent.key === "therapy") && <div style={{ textAlign: "center", marginTop: 5, cursor: "pointer", fontSize: 12, color: "#1890ff" }} onClick={() => openDrawerForAgent(agent.key)}>View All</div>}
                 </Card>
               </div>
             );
@@ -366,10 +415,36 @@ const WorkflowPipeline: React.FC = () => {
                       key={sIdx}
                       title={step.title}
                       status={getStepStatus(step, drawerAgent)}
-                      description={step.output_data ? (
-                        <Text>{step.output_data.depression_label ?? step.output_data.emotion ?? JSON.stringify(step.output_data)}</Text>
-                      ) : null} />
+                      description={
+                        <div>
+                          {/* timestamp */}
+                          {step.timestamp && (
+                            <Text type="secondary">{formatTimestamp(step.timestamp)}</Text>
+                          )}
+
+                          {/* therapy children */}
+                          {step.children && (
+                            <div style={{ marginTop: 8, paddingLeft: 12 }}>
+                              {step.children.map((child, cIdx) => (
+                                <div key={cIdx} style={{ marginBottom: 8 }}>
+                                  <Text strong>{child.title}</Text>
+                                  <br />
+                                  {child.timestamp && (
+                                    <Text type="secondary">
+                                      {formatTimestamp(child.timestamp)}
+                                    </Text>
+                                  )}
+
+                                
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      }
+                    />
                   );
+
                 })}
               </Steps>
             </Card>
