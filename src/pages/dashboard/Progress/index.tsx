@@ -221,7 +221,7 @@ const WorkflowPipeline: React.FC = () => {
             finished: !!followUpEvent,
             output_data: followUpEvent
               ? {
-                  followup_at: followUpEvent.timestamp,
+                  started_at: followUpEvent.timestamp,
                   response: followUpEvent.output_data?.response,
                 }
               : undefined,
@@ -375,7 +375,7 @@ const WorkflowPipeline: React.FC = () => {
   const openDrawerForAgent = (agentKey: string) => {
     setDrawerAgent(agentKey);
     setDrawerVisible(true);
-    setPhqExpanded(false); 
+    setPhqExpanded(false);
   };
 
   const formatTimestamp = (ts: string) => {
@@ -513,7 +513,6 @@ const WorkflowPipeline: React.FC = () => {
               )}
             >
               {getAgentSteps(drawerAgent).map((step, sIdx) => {
-                // PHQ main step
                 if (step.eventKey === "phq_main") {
                   return (
                     <Step
@@ -538,10 +537,10 @@ const WorkflowPipeline: React.FC = () => {
                           >
                             {step.children?.map((sub, subIdx) => {
                               const ts = sub.phqEvent?.timestamp;
-                              const label =
-                                sub.phqEvent?.output_data?.phq9_question ??
-                                sub.phqEvent?.phq9_question ??
-                                sub.title;
+                              const questionId =
+                                sub.phqEvent?.output_data?.phq9_questionID ??
+                                sub.phqEvent?.phq9_questionID;
+
                               return (
                                 <div
                                   key={subIdx}
@@ -559,7 +558,9 @@ const WorkflowPipeline: React.FC = () => {
                                     }}
                                   >
                                     <Text strong style={{ fontSize: 13 }}>
-                                      {label}
+                                      {questionId
+                                        ? `PHQ9 - ${questionId}`
+                                        : "-"}
                                     </Text>
                                     <Text
                                       type="secondary"
@@ -609,7 +610,7 @@ const WorkflowPipeline: React.FC = () => {
                                   style={{
                                     display: "flex",
                                     alignItems: "center",
-                                    gap: 8, 
+                                    gap: 8,
                                     paddingLeft: 10,
                                   }}
                                 >
