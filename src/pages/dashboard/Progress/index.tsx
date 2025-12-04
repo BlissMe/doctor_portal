@@ -60,6 +60,7 @@ const WorkflowPipeline: React.FC = () => {
   const [phqExpanded, setPhqExpanded] = useState<boolean>(false);
   const stepsRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const PYTHON_URL = import.meta.env.VITE_APP_PYTHON_URL
   const agentMapping: Record<string, string> = {
     chat: "assessment",
     classifier: "classifier",
@@ -83,7 +84,7 @@ const WorkflowPipeline: React.FC = () => {
       setLoading(true);
       try {
         const res = await axios.get(
-          `http://localhost:8000/monitor-agent/get-session-events?user_id=${userId}`
+          `${PYTHON_URL}/monitor-agent/get-session-events?user_id=${userId}`
         );
         setEvents(res.data.events);
 
