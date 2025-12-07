@@ -1,675 +1,337 @@
-import React, { useEffect, useState, useRef } from "react";
-import { Card, Typography, Spin, Steps, Drawer } from "antd";
-import { CheckCircleTwoTone, ClockCircleTwoTone } from "@ant-design/icons";
-import axios from "axios";
+import React, { useEffect, useState, useMemo } from "react";
+import {
+  Row,
+  Col,
+  Card,
+  Table,
+  Tag,
+  Timeline,
+  Drawer,
+  Descriptions,
+  Select,
+  DatePicker,
+  Input,
+  Button,
+  Space,
+  Statistic,
+  Badge,
+  Empty,
+  Spin,
+} from "antd";
+import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 
-const { Step } = Steps;
-const { Text } = Typography;
+const { RangePicker } = DatePicker;
+const { Option } = Select;
 
-interface SessionEvent {
-  event?: string;
-  timestamp: string;
-  agent_name?: string;
-  phq9_questionID?: number;
-  phq9_question?: string;
-  phq9_completed?: boolean;
-  phq9_started?: boolean;
-  input_data?: Record<string, any>;
-  output_data?: Record<string, any>;
-  user_id: number;
-  session_id: number;
-  phq9_progress?: boolean;
-}
+// --- Configuration ---
+const API_BASE = import.meta.env.REACT_APP_API_BASE;
+const COLORS = ["#2f54eb", "#fa8c16", "#ff4d4f"]; // low, medium, high
 
-interface Agent {
-  name: string;
-  key: string;
-}
-
-interface StepBase {
-  title: string;
-  eventKey: string;
-  output_data?: Record<string, any>;
-  children?: StepData[];
-  phqEvent?: SessionEvent;
-  input_data?: Record<string, any>;
-  finished?: boolean;
-}
-
-type StepData = StepBase;
-
-const agents: Agent[] = [
-  { name: "Assessment Agent", key: "assessment" },
-  { name: "Classifier Agent", key: "classifier" },
-  { name: "Therapy Agent", key: "therapy" },
-];
-
-const CARD_HEIGHT = 320;
-
-const WorkflowPipeline: React.FC = () => {
-  const [events, setEvents] = useState<SessionEvent[]>([]);
-  const [agentEvents, setAgentEvents] = useState<
-    Record<string, SessionEvent[]>
-  >({});
-  const [selectedAgent, setSelectedAgent] = useState<string>("assessment");
-  const [userId, setUserId] = useState<number | null>(null);
-  const [sessionId, setSessionId] = useState<number | null>(null);
-  const [nickname, setNickname] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [drawerAgent, setDrawerAgent] = useState<string | null>(null);
-  const [phqExpanded, setPhqExpanded] = useState<boolean>(false);
-  const stepsRefs = useRef<Record<string, HTMLDivElement | null>>({});
+export default function MonitorAgentDashboard() {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const PYTHON_URL = import.meta.env.VITE_APP_PYTHON_URL
-  const agentMapping: Record<string, string> = {
-    chat: "assessment",
-    classifier: "classifier",
-    therapy: "therapy",
-  };
+  const [agentFilter, setAgentFilter] = useState(undefined);
+  const [riskFilter, setRiskFilter] = useState(undefined);
+  const [searchText, setSearchText] = useState("");
+  const [dateRange, setDateRange] = useState(null);
+
+  // Fetch events (default: all users). You can change this to fetch per-user sessions.
+  async function fetchEvents() {
+    try {
+      setLoading(true);
+      // Example: fetch all events for demo. Adapt to your backend query params.
+      const res = await fetch(`${API_BASE}/monitor-agent/get-session-events?user_id=1`);
+      const data = await res.json();
+      // Expected structure { user_id, events: [...] }
+      const normalized = (data.events || []).map((e) => ({
+        ...e,
+        timestamp: e.timestamp ? new Date(e.timestamp) : null,
+        risk_level: (e.risk_level || (e.monitor_summary && e.risk_level)) || e.risk_level || "low",
+      }));
+      setEvents(normalized.reverse()); // show newest first
+    } catch (err) {
+      console.error("fetchEvents", err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const storedData = localStorage.getItem("phqStepData");
-    if (storedData) {
-      const { userId, sessionId, nickname } = JSON.parse(storedData);
-      setUserId(userId);
-      setSessionId(sessionId);
-      setNickname(nickname);
-    }
+    fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!userId || !sessionId) return;
+  const agents = useMemo(() => {
+    return Array.from(new Set(events.map((e) => e.agent_name))).filter(Boolean);
+  }, [events]);
 
-    const fetchEvents = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get(
-          `${PYTHON_URL}/monitor-agent/get-session-events?user_id=${userId}`
-        );
-        setEvents(res.data.events);
-
-        const grouped: Record<string, SessionEvent[]> = {};
-        res.data.events.forEach((e: SessionEvent) => {
-          const rawName = e.agent_name?.toLowerCase() || "unknown";
-          const agentKey = agentMapping[rawName] || "unknown";
-          if (!grouped[agentKey]) grouped[agentKey] = [];
-          grouped[agentKey].push(e);
-        });
-        setAgentEvents(grouped);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEvents();
-  }, [userId, sessionId]);
-
-  useEffect(() => {
-    const checkOverflow = () => {
-      const newOverflow: Record<string, boolean> = {};
-      agents.forEach((agent) => {
-        const el = stepsRefs.current[agent.key];
-        newOverflow[agent.key] = el ? el.scrollHeight > el.clientHeight : false;
-      });
-    };
-
-    checkOverflow();
-    window.addEventListener("resize", checkOverflow);
-    return () => window.removeEventListener("resize", checkOverflow);
-  }, [agentEvents]);
-
-  if (!userId || !sessionId) return <div>No session selected.</div>;
-  if (loading)
-    return (
-      <Spin size="large" tip="Loading workflow..." style={{ margin: 50 }} />
-    );
-
-  const getAgentSteps = (
-    agentKey: string,
-    grouped: Record<string, SessionEvent[]> = agentEvents
-  ): StepData[] => {
-    const evts = grouped[agentKey] || [];
-    console.log("Getting steps for agent:", agentKey, evts);
-
-    switch (agentKey) {
-      case "assessment": {
-        const phqEvents = evts.filter(
-          (e) =>
-            e.output_data?.phq9_questionID !== undefined ||
-            e.phq9_questionID !== undefined
-        );
-
-        const started = phqEvents.some(
-          (e) => e.output_data?.phq9_started === true || e.phq9_started === true
-        );
-
-        const completed = phqEvents.some(
-          (e) =>
-            e.output_data?.phq9_completed === true || e.phq9_completed === true
-        );
-
-        const inProgress = phqEvents.filter(
-          (e) => e.output_data?.phq9_progress || e.phq9_progress
-        );
-        const firstEventTimestamp = evts[0]?.timestamp;
-
-        const children: StepData[] = inProgress
-          .sort(
-            (a, b) =>
-              (a.output_data?.phq9_questionID ?? a.phq9_questionID ?? 0) -
-              (b.output_data?.phq9_questionID ?? b.phq9_questionID ?? 0)
-          )
-          .map((e) => ({
-            title: e.output_data?.phq9_question ?? e.phq9_question ?? "-",
-            eventKey: `phq_q_${e.phq9_questionID}`,
-            phqEvent: e,
-          }));
-
-        // NEW: Detect follow-up event
-        const followUpEvent = evts.find(
-          (e) => e.output_data?.event === "FOLLOWUP_CHAT"
-        );
-
-        return [
-          {
-            title: "Session Started",
-            eventKey: "session_started",
-            finished: true,
-            output_data: {
-              started_at: firstEventTimestamp,
-            },
-          },
-          {
-            title: "Initial Chat",
-            eventKey: "initial",
-            finished: true,
-            output_data: {
-              started_at: firstEventTimestamp,
-            },
-          },
-          {
-            title: "PHQ Started",
-            eventKey: "phq_started",
-            finished: started,
-            output_data: started
-              ? {
-                  started_at: phqEvents[0]?.timestamp,
-                }
-              : undefined,
-          },
-
-          {
-            title: "PHQ In Progress",
-            eventKey: "phq_main",
-            children,
-          },
-          {
-            title: "PHQ Completed",
-            eventKey: "phq_completed",
-            finished: completed,
-            output_data: completed
-              ? {
-                  started_at: phqEvents[0]?.timestamp,
-                }
-              : undefined,
-          },
-
-          {
-            title: "Follow-up",
-            eventKey: "followup",
-            finished: !!followUpEvent,
-            output_data: followUpEvent
-              ? {
-                  started_at: followUpEvent.timestamp,
-                  response: followUpEvent.output_data?.response,
-                }
-              : undefined,
-          },
-        ];
-      }
-      case "classifier": {
-        const endEvent = evts.find(
-          (e) =>
-            e.event === "session_end" ||
-            e.output_data?.event === "session_end" ||
-            e.output_data?.event === "end_session"
-        );
-
-        const detectionEvent = evts.find(
-          (e) =>
-            e.event === "depression_detection" ||
-            e.output_data?.event === "depression_detection"
-        );
-
-        return [
-          {
-            title: "End Session",
-            eventKey: "end_session",
-            finished: !!endEvent,
-            output_data: endEvent
-              ? {
-                  started_at: endEvent.timestamp,
-                }
-              : undefined,
-          },
-          {
-            title: "Level Detection",
-            eventKey: "depression_detection",
-            finished: !!detectionEvent,
-            output_data: detectionEvent
-              ? {
-                  started_at: detectionEvent.timestamp,
-                }
-              : undefined,
-          },
-        ];
-      }
-      case "therapy": {
-        const suggestedEvents = evts.filter(
-          (e) => (e.input_data?.event || e.event) === "THERAPY_SUGGESTED"
-        );
-        const therapySteps: StepData[] = suggestedEvents.map((therapy, idx) => {
-          const therapyName =
-            therapy.output_data?.therapy_name ?? `Therapy ${idx + 1}`;
-          const startEvent = evts.find(
-            (e) =>
-              (e.input_data?.event || e.event) === "THERAPY_STARTED" ||
-              e.input_data?.therapy_name === therapyName
-          );
-          const progressEvent = evts.find(
-            (e) =>
-              (e.input_data?.event || e.event) === "THERAPY_IN_PROGRESS" ||
-              e.input_data?.therapy_name === therapyName
-          );
-          const completedEvent = evts.find(
-            (e) =>
-              (e.input_data?.event || e.event) === "THERAPY_ENDED" ||
-              e.input_data?.therapy_name === therapyName
-          );
-          const mainFinished = !!completedEvent;
-          return {
-            title: therapyName,
-            eventKey: `therapy_${idx}`,
-            finished: mainFinished,
-            children: [
-              {
-                title: "Therapy Started",
-                eventKey: `therapy_${idx}_started`,
-                finished: !!startEvent,
-                output_data: startEvent
-                  ? { started_at: startEvent.timestamp }
-                  : undefined,
-              },
-              {
-                title: "Therapy In Progress",
-                eventKey: `therapy_${idx}_in_progress`,
-                finished: !!progressEvent,
-                output_data: progressEvent
-                  ? { started_at: progressEvent.timestamp }
-                  : undefined,
-              },
-              {
-                title: "Therapy Completed",
-                eventKey: `therapy_${idx}_completed`,
-                finished: !!completedEvent,
-                output_data: completedEvent
-                  ? { started_at: completedEvent.timestamp }
-                  : undefined,
-              },
-            ],
-            output_data: completedEvent
-              ? { started_at: completedEvent.timestamp }
-              : undefined,
-          };
-        });
-
-        return therapySteps;
-      }
-
-      default:
-        return [];
-    }
-  };
-
-  const getStepStatus = (step: StepData, agentKey: string) => {
-    const evts = agentEvents[agentKey] || [];
-
-    if (step.phqEvent) return "finish";
-    if (step.eventKey === "phq_main") {
-      const completed = evts.some(
-        (e) => e.output_data?.phq9_completed === true
-      );
-      if (completed) return "finish";
-
-      const started = evts.some(
-        (e) =>
-          e.output_data?.phq9_questionID !== undefined ||
-          e.phq9_questionID !== undefined
-      );
-      return started ? "process" : "wait";
-    }
-    const matched = evts.some((e) => {
-      const inputEvent = e.event?.toLowerCase();
-      const inputDataEvent = e.input_data?.event?.toLowerCase();
-      const outputEvent = e.output_data?.event?.toLowerCase();
-      const target = step.eventKey.toLowerCase();
-
-      return (
-        inputEvent === target ||
-        inputDataEvent === target ||
-        outputEvent === target
-      );
+  const stats = useMemo(() => {
+    const total = events.length;
+    const anomalies = events.filter((e) => e.anomaly_detected).length;
+    const byRisk = { low: 0, medium: 0, high: 0 };
+    events.forEach((e) => {
+      const r = (e.risk_level || "low").toLowerCase();
+      byRisk[r] = (byRisk[r] || 0) + 1;
     });
 
-    if (matched || step.finished) return "finish";
+    return { total, anomalies, byRisk };
+  }, [events]);
 
-    return "wait";
-  };
+  const pieData = [
+    { name: "Low", value: stats.byRisk.low },
+    { name: "Medium", value: stats.byRisk.medium },
+    { name: "High", value: stats.byRisk.high },
+  ];
 
-  const isAgentActive = (agentKey: string) =>
-    getAgentSteps(agentKey).some(
-      (s) => getStepStatus(s, agentKey) === "process"
-    );
+  function riskTag(risk) {
+    const r = (risk || "low").toLowerCase();
+    const color = r === "high" ? "red" : r === "medium" ? "orange" : "green";
+    return <Tag color={color}>{r.toUpperCase()}</Tag>;
+  }
 
-  const openDrawerForAgent = (agentKey: string) => {
-    setDrawerAgent(agentKey);
+  function openDrawer(record) {
+    setSelectedEvent(record);
     setDrawerVisible(true);
-    setPhqExpanded(false);
-  };
+  }
 
-  const formatTimestamp = (ts: string) => {
-    try {
-      return new Date(ts + "Z").toLocaleString("en-GB", {
-        timeZone: "Asia/Colombo",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
-    } catch {
-      return ts;
+  const filteredEvents = events.filter((e) => {
+    if (agentFilter && e.agent_name !== agentFilter) return false;
+    if (riskFilter && (e.risk_level || "").toLowerCase() !== riskFilter) return false;
+    if (searchText) {
+      const hay = `${e.agent_name} ${JSON.stringify(e.input_data)} ${JSON.stringify(e.output_data)} ${e.monitor_summary || ""}`.toLowerCase();
+      if (!hay.includes(searchText.toLowerCase())) return false;
     }
-  };
+    if (dateRange && dateRange.length === 2 && e.timestamp) {
+      const [start, end] = dateRange;
+      if (!(e.timestamp >= start.startOf && e.timestamp >= start && e.timestamp <= end)) {
+        // fallback: compare Date objects
+        const s = dateRange[0].toDate ? dateRange[0].toDate() : dateRange[0];
+        const en = dateRange[1].toDate ? dateRange[1].toDate() : dateRange[1];
+        if (e.timestamp < s || e.timestamp > en) return false;
+      }
+    }
+    return true;
+  });
+
+  const columns = [
+    {
+      title: "Timestamp",
+      dataIndex: "timestamp",
+      key: "timestamp",
+      render: (t) => (t ? new Date(t).toLocaleString() : "-"),
+      sorter: (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
+      defaultSortOrder: "descend",
+    },
+    {
+      title: "Agent",
+      dataIndex: "agent_name",
+      key: "agent_name",
+      filters: agents.map((a) => ({ text: a, value: a })),
+      onFilter: (value, record) => record.agent_name === value,
+    },
+    {
+      title: "Summary",
+      dataIndex: "monitor_summary",
+      key: "monitor_summary",
+      render: (t) => <div style={{ maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t || <i>—</i>}</div>,
+    },
+    {
+      title: "Risk",
+      dataIndex: "risk_level",
+      key: "risk_level",
+      render: (r) => riskTag(r),
+      filters: [
+        { text: "Low", value: "low" },
+        { text: "Medium", value: "medium" },
+        { text: "High", value: "high" },
+      ],
+      onFilter: (value, record) => (record.risk_level || "").toLowerCase() === value,
+    },
+    {
+      title: "Anomaly",
+      dataIndex: "anomaly_detected",
+      key: "anomaly_detected",
+      render: (a) => (a ? <Badge status="error" text="Yes" /> : <Badge status="success" text="No" />),
+      filters: [
+        { text: "Yes", value: "yes" },
+        { text: "No", value: "no" },
+      ],
+      onFilter: (value, record) => (value === "yes" ? record.anomaly_detected : !record.anomaly_detected),
+    },
+  ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        width: "100%",
-        gap: 20,
-        flexDirection: "column",
-      }}
-    >
-      <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          Visualizing Multi-Agent Workflow Progress in Real-Time - {nickname}
-        </Typography.Title>
-      </div>
+    <div style={{ padding: 24 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={24} md={16} lg={16} xl={16}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
+              <Card>
+                <Statistic title="Total Events" value={stats.total} />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Card>
+                <Statistic title="Anomalies" value={stats.anomalies} />
+              </Card>
+            </Col>
+            <Col xs={24} sm={24} md={8}>
+              <Card>
+                <Statistic title="Risk: High" value={stats.byRisk.high} />
+              </Card>
+            </Col>
+          </Row>
+        </Col>
 
-      <div style={{ display: "flex", width: "100%", gap: 20 }}>
-        <div
-          style={{
-            display: "flex",
-            gap: 24,
-            justifyContent: "center",
-            marginBottom: 30,
-          }}
-        >
-          {agents.map((agent, idx) => {
-            const steps = getAgentSteps(agent.key);
-            const activeStepIndex = steps.findIndex(
-              (s) => getStepStatus(s, agent.key) === "process"
-            );
-            const isLeft = idx % 2 === 0;
-            const agentActive = isAgentActive(agent.key);
-
-            return (
-              <div
-                key={agent.key}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  justifyContent: isLeft ? "flex-start" : "flex-end",
-                  alignItems: "center",
-                  position: "relative",
-                  gap: 20,
-                }}
-              >
-                <Card
-                  title={
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
-                      {agentActive ? (
-                        <ClockCircleTwoTone twoToneColor="#52c41a" />
-                      ) : (
-                        <CheckCircleTwoTone twoToneColor="#d9d9d9" />
-                      )}
-                      <span>{agent.name}</span>
-                    </div>
-                  }
-                  style={{
-                    width: 300,
-                    height: CARD_HEIGHT,
-                    borderColor:
-                      selectedAgent === agent.key ? "#1890ff" : undefined,
-                    borderWidth: selectedAgent === agent.key ? 2 : 1,
-                    cursor: "pointer",
-                  }}
-                  onClick={() => openDrawerForAgent(agent.key)}
-                >
-                  <div
-                    style={{ maxHeight: CARD_HEIGHT - 120, overflow: "hidden" }}
-                    ref={(el) => void (stepsRefs.current[agent.key] = el)}
-                  >
-                    <Steps
-                      direction="vertical"
-                      current={
-                        activeStepIndex !== -1
-                          ? activeStepIndex
-                          : steps.length - 1
-                      }
-                    >
-                      {steps.map((step, sIdx) => (
-                        <Step
-                          key={sIdx}
-                          title={step.title}
-                          status={getStepStatus(step, agent.key)}
-                          description={
-                            step.output_data ? (
-                              <Text>
-                                {step.output_data.started_at
-                                  ? formatTimestamp(step.output_data.started_at)
-                                  : step.output_data.depression_label ??
-                                    step.output_data.emotion ??
-                                    JSON.stringify(step.output_data)}
-                              </Text>
-                            ) : null
-                          }
-                        />
+        <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+          <Card title="Risk Distribution" style={{ height: "100%" }}>
+            {stats.total === 0 ? (
+              <Empty description="No data" />
+            ) : (
+              <div style={{ height: 180 }}>
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={60} label>
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
-                    </Steps>
-                  </div>
-                </Card>
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            );
-          })}
-        </div>
-        {drawerVisible && drawerAgent && (
-          <Drawer
-            title={agents.find((a) => a.key === drawerAgent)?.name}
-            placement="right"
-            width={500}
-            onClose={() => setDrawerVisible(false)}
-            visible={drawerVisible}
-          >
-            <Steps
-              direction="vertical"
-              current={getAgentSteps(drawerAgent).findIndex(
-                (s) => getStepStatus(s, drawerAgent) === "process"
-              )}
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      <Card style={{ marginBottom: 16 }}>
+        <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
+          <Space>
+            <Input
+              placeholder="Search input/output/summary"
+              prefix={<SearchOutlined />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: 320 }}
+            />
+
+            <Select
+              placeholder="Filter by agent"
+              allowClear
+              style={{ width: 160 }}
+              value={agentFilter}
+              onChange={(v) => setAgentFilter(v)}
             >
-              {getAgentSteps(drawerAgent).map((step, sIdx) => {
-                if (step.eventKey === "phq_main") {
-                  return (
-                    <Step
-                      key={sIdx}
-                      title={
-                        <div
-                          style={{ cursor: "pointer" }}
-                          onClick={() => setPhqExpanded((prev) => !prev)}
-                        >
-                          {step.title} {phqExpanded ? "▼" : "▶"}
-                        </div>
-                      }
-                      status={getStepStatus(step, drawerAgent)}
-                      description={
-                        phqExpanded ? (
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 6,
-                            }}
-                          >
-                            {step.children?.map((sub, subIdx) => {
-                              const ts = sub.phqEvent?.timestamp;
-                              const questionId =
-                                sub.phqEvent?.output_data?.phq9_questionID ??
-                                sub.phqEvent?.phq9_questionID;
+              {agents.map((a) => (
+                <Option key={a} value={a}>
+                  {a}
+                </Option>
+              ))}
+            </Select>
 
-                              return (
-                                <div
-                                  key={subIdx}
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    paddingLeft: 6,
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                    }}
-                                  >
-                                    <Text strong style={{ fontSize: 13 }}>
-                                      {questionId
-                                        ? `PHQ9 - ${questionId}`
-                                        : "-"}
-                                    </Text>
-                                    <Text
-                                      type="secondary"
-                                      style={{ fontSize: 12 }}
-                                    >
-                                      {ts ? formatTimestamp(ts) : ""}
-                                    </Text>
-                                  </div>
-                                  <div>
-                                    {getStepStatus(sub, drawerAgent) ===
-                                    "finish" ? (
-                                      <CheckCircleTwoTone twoToneColor="#52c41a" />
-                                    ) : (
-                                      <ClockCircleTwoTone twoToneColor="#d9d9d9" />
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null
-                      }
-                    />
-                  );
-                }
-                if (drawerAgent === "therapy" && step.children) {
-                  return (
-                    <Step
-                      key={sIdx}
-                      title={<Text strong>{step.title}</Text>}
-                      status={getStepStatus(step, drawerAgent)}
-                      description={
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 6,
-                            marginTop: 4,
-                          }}
-                        >
-                          {step.children.map(
-                            (sub, subIdx) => (
-                              console.log("Rendering therapy sub-step:", sub),
-                              (
-                                <div
-                                  key={subIdx}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    paddingLeft: 10,
-                                  }}
-                                >
-                                  <Text style={{ fontSize: 13, flex: 1 }}>
-                                    {sub.title}
-                                  </Text>
+            <Select
+              placeholder="Filter by risk"
+              allowClear
+              style={{ width: 140 }}
+              value={riskFilter}
+              onChange={(v) => setRiskFilter(v)}
+            >
+              <Option value="low">Low</Option>
+              <Option value="medium">Medium</Option>
+              <Option value="high">High</Option>
+            </Select>
 
-                                  {getStepStatus(sub, drawerAgent) ===
-                                  "finish" ? (
-                                    <CheckCircleTwoTone twoToneColor="#52c41a" />
-                                  ) : (
-                                    <ClockCircleTwoTone twoToneColor="#d9d9d9" />
-                                  )}
+            <RangePicker onChange={(r) => setDateRange(r)} />
 
-                                  <Text
-                                    type="secondary"
-                                    style={{ fontSize: 12 }}
-                                  >
-                                    {sub.output_data?.started_at
-                                      ? formatTimestamp(
-                                          sub.output_data.started_at
-                                        )
-                                      : ""}
-                                  </Text>
-                                </div>
-                              )
-                            )
-                          )}
-                        </div>
-                      }
-                    />
-                  );
-                }
-                return (
-                  <Step
-                    key={sIdx}
-                    title={step.title}
-                    status={getStepStatus(step, drawerAgent)}
-                    description={
-                      step.output_data ? (
-                        <Text>
-                          {step.output_data.started_at
-                            ? formatTimestamp(step.output_data.started_at)
-                            : step.output_data.depression_label ??
-                              step.output_data.emotion ??
-                              null}
-                        </Text>
-                      ) : null
-                    }
-                  />
-                );
-              })}
-            </Steps>
-          </Drawer>
+            <Button icon={<ReloadOutlined />} onClick={fetchEvents} />
+          </Space>
+
+          <Space>
+            <Button onClick={() => { setSearchText(""); setAgentFilter(undefined); setRiskFilter(undefined); setDateRange(null); }}>Reset</Button>
+            <Button type="primary" onClick={fetchEvents}>Refresh</Button>
+          </Space>
+        </Space>
+      </Card>
+
+      <Card>
+        <Spin spinning={loading} tip="Loading events...">
+          <Table
+            columns={columns}
+            dataSource={filteredEvents}
+            rowKey={(r) => r._id || `${r.timestamp}-${r.agent_name}`}
+            onRow={(record) => ({
+              onClick: () => openDrawer(record),
+            })}
+            pagination={{ pageSize: 12 }}
+            locale={{ emptyText: <Empty description="No events" /> }}
+          />
+        </Spin>
+      </Card>
+
+      <Drawer
+        title={selectedEvent ? `${selectedEvent.agent_name} — ${selectedEvent.risk_level?.toUpperCase() || ""}` : "Event details"}
+        visible={drawerVisible}
+        width={720}
+        onClose={() => setDrawerVisible(false)}
+      >
+        {selectedEvent ? (
+          <>
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="Timestamp">{selectedEvent.timestamp ? new Date(selectedEvent.timestamp).toLocaleString() : "-"}</Descriptions.Item>
+              <Descriptions.Item label="Agent">{selectedEvent.agent_name}</Descriptions.Item>
+              <Descriptions.Item label="Session/User">{`${selectedEvent.session_id || "-"} / ${selectedEvent.user_id || "-"}`}</Descriptions.Item>
+              <Descriptions.Item label="Risk">{riskTag(selectedEvent.risk_level)}</Descriptions.Item>
+              <Descriptions.Item label="Anomaly Detected">{selectedEvent.anomaly_detected ? "Yes" : "No"}</Descriptions.Item>
+              <Descriptions.Item label="AI Summary">{selectedEvent.monitor_summary || "—"}</Descriptions.Item>
+            </Descriptions>
+
+            <Card title="Input Data" size="small" style={{ marginTop: 12 }}>
+              <pre style={{ maxHeight: 220, overflow: "auto" }}>{JSON.stringify(selectedEvent.input_data, null, 2)}</pre>
+            </Card>
+
+            <Card title="Output Data" size="small" style={{ marginTop: 12 }}>
+              <pre style={{ maxHeight: 220, overflow: "auto" }}>{JSON.stringify(selectedEvent.output_data, null, 2)}</pre>
+            </Card>
+
+            <Card title="AI Agent Details" size="small" style={{ marginTop: 12 }}>
+              <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(selectedEvent.monitoring || selectedEvent.monitor_result || {}, null, 2)}</pre>
+            </Card>
+          </>
+        ) : (
+          <Empty />
         )}
-      </div>
+      </Drawer>
+
+      <Card title="Activity Timeline" style={{ marginTop: 16 }}>
+        {events.length === 0 ? (
+          <Empty description="No timeline" />
+        ) : (
+          <Timeline>
+            {events.slice(0, 50).map((e) => (
+              <Timeline.Item
+                key={e._id || `${e.timestamp}-${e.agent_name}`}
+                color={(e.risk_level || "low").toLowerCase() === "high" ? "red" : (e.risk_level || "low").toLowerCase() === "medium" ? "orange" : "green"}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <b>{e.agent_name}</b>
+                    <div style={{ fontSize: 12 }}>{e.monitor_summary || (e.output_data && JSON.stringify(e.output_data).slice(0, 120))}</div>
+                  </div>
+                  <div style={{ textAlign: "right", minWidth: 160 }}>
+                    <div style={{ fontSize: 12 }}>{e.timestamp ? new Date(e.timestamp).toLocaleString() : "-"}</div>
+                    <div>{riskTag(e.risk_level)}</div>
+                  </div>
+                </div>
+              </Timeline.Item>
+            ))}
+          </Timeline>
+        )}
+      </Card>
     </div>
   );
-};
-
-export default WorkflowPipeline;
+}
