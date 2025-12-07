@@ -25,7 +25,7 @@ const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 // --- Configuration ---
-const API_BASE = import.meta.env.REACT_APP_API_BASE;
+const API_BASE = import.meta.env.VITE_APP_PYTHON_URL;
 const COLORS = ["#2f54eb", "#fa8c16", "#ff4d4f"]; // low, medium, high
 
 export default function MonitorAgentDashboard() {
