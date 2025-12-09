@@ -442,6 +442,9 @@ export default function MonitorAgentDashboard() {
               <Descriptions.Item label="Anomaly Detected">
                 {selectedEvent.anomaly_detected ? "Yes" : "No"}
               </Descriptions.Item>
+               <Descriptions.Item label="Possible Issue">
+                {selectedEvent.possible_issue || "—"}
+              </Descriptions.Item>
               <Descriptions.Item label="AI Summary">
                 {selectedEvent.monitor_summary || "—"}
               </Descriptions.Item>
