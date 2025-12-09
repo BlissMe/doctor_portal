@@ -1,57 +1,106 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Row,
   Col,
   Card,
   Table,
   Tag,
-  Timeline,
   Drawer,
   Descriptions,
   Select,
-  DatePicker,
-  Input,
   Button,
   Space,
   Statistic,
   Badge,
   Empty,
   Spin,
+  Typography,
+  Timeline
 } from "antd";
-import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+} from "recharts";
+import {
+  ExclamationCircleOutlined,
+  WarningOutlined,
+  RadarChartOutlined,
+} from "@ant-design/icons";
 
-const { RangePicker } = DatePicker;
 const { Option } = Select;
 
-// --- Configuration ---
 const API_BASE = import.meta.env.VITE_APP_PYTHON_URL;
-const COLORS = ["#2f54eb", "#fa8c16", "#ff4d4f"]; // low, medium, high
+const COLORS = ["#2f54eb", "#fa8c16", "#ff4d4f"];
+
+// ------------------------------
+// TYPES
+// ------------------------------
+interface EventRecord {
+  _id?: string;
+  timestamp?: string | Date | null;
+  agent_name?: string;
+  risk_level?: string;
+  session_id?: string;
+  user_id?: string;
+  anomaly_detected?: boolean;
+  monitor_summary?: string;
+  monitoring?: unknown;
+  monitor_result?: unknown;
+  input_data?: unknown;
+  output_data?: unknown;
+}
+
+// ------------------------------
 
 export default function MonitorAgentDashboard() {
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [agentFilter, setAgentFilter] = useState(undefined);
-  const [riskFilter, setRiskFilter] = useState(undefined);
-  const [searchText, setSearchText] = useState("");
-  const [dateRange, setDateRange] = useState(null);
 
-  // Fetch events (default: all users). You can change this to fetch per-user sessions.
+  const [selectedEvent, setSelectedEvent] = useState<EventRecord | null>(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  const [agentFilter, setAgentFilter] = useState<string | undefined>(undefined);
+  const [riskFilter, setRiskFilter] = useState<string | undefined>(undefined);
+  const [searchText, setSearchText] = useState("");
+
+  const [userId, setUserId] = useState<string | null>(null);
+  const [nickname, setNickname] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedData = localStorage.getItem("phqStepData");
+    if (storedData) {
+      const { userId, nickname } = JSON.parse(storedData);
+      setUserId(userId);
+      setNickname(nickname);
+    }
+  }, []);
+
+  // Fetch events
   async function fetchEvents() {
+    if (!userId) return;
+
     try {
       setLoading(true);
-      // Example: fetch all events for demo. Adapt to your backend query params.
-      const res = await fetch(`${API_BASE}/monitor-agent/get-session-events?user_id=1`);
+
+      const res = await fetch(
+        `${API_BASE}/monitor-agent/get-session-events?user_id=${userId}`
+      );
       const data = await res.json();
-      // Expected structure { user_id, events: [...] }
-      const normalized = (data.events || []).map((e) => ({
-        ...e,
-        timestamp: e.timestamp ? new Date(e.timestamp) : null,
-        risk_level: (e.risk_level || (e.monitor_summary && e.risk_level)) || e.risk_level || "low",
-      }));
-      setEvents(normalized.reverse()); // show newest first
+
+      const normalized: EventRecord[] = (data.events || []).map(
+        (e: EventRecord) => ({
+          ...e,
+          timestamp: e.timestamp ? new Date(e.timestamp) : null,
+          risk_level:
+            e.risk_level || (e.monitor_summary && e.risk_level) || "low",
+        })
+      );
+
+      setEvents(normalized.reverse());
     } catch (err) {
       console.error("fetchEvents", err);
     } finally {
@@ -60,20 +109,25 @@ export default function MonitorAgentDashboard() {
   }
 
   useEffect(() => {
-    fetchEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (userId) fetchEvents();
+  }, [userId]);
 
+  // Agent list
   const agents = useMemo(() => {
     return Array.from(new Set(events.map((e) => e.agent_name))).filter(Boolean);
   }, [events]);
 
+  // Stats
   const stats = useMemo(() => {
     const total = events.length;
     const anomalies = events.filter((e) => e.anomaly_detected).length;
+
     const byRisk = { low: 0, medium: 0, high: 0 };
     events.forEach((e) => {
-      const r = (e.risk_level || "low").toLowerCase();
+      const r = (e.risk_level || "low").toLowerCase() as
+        | "low"
+        | "medium"
+        | "high";
       byRisk[r] = (byRisk[r] || 0) + 1;
     });
 
@@ -86,121 +140,207 @@ export default function MonitorAgentDashboard() {
     { name: "High", value: stats.byRisk.high },
   ];
 
-  function riskTag(risk) {
+  // Risk tag UI
+  function riskTag(risk?: string) {
     const r = (risk || "low").toLowerCase();
     const color = r === "high" ? "red" : r === "medium" ? "orange" : "green";
     return <Tag color={color}>{r.toUpperCase()}</Tag>;
   }
 
-  function openDrawer(record) {
+  function openDrawer(record: EventRecord) {
     setSelectedEvent(record);
     setDrawerVisible(true);
   }
 
+  // Filters
   const filteredEvents = events.filter((e) => {
     if (agentFilter && e.agent_name !== agentFilter) return false;
-    if (riskFilter && (e.risk_level || "").toLowerCase() !== riskFilter) return false;
+    if (riskFilter && (e.risk_level || "").toLowerCase() !== riskFilter)
+      return false;
+
     if (searchText) {
-      const hay = `${e.agent_name} ${JSON.stringify(e.input_data)} ${JSON.stringify(e.output_data)} ${e.monitor_summary || ""}`.toLowerCase();
+      const hay = `${e.agent_name} ${JSON.stringify(
+        e.input_data
+      )} ${JSON.stringify(e.output_data)} ${
+        e.monitor_summary || ""
+      }`.toLowerCase();
+
       if (!hay.includes(searchText.toLowerCase())) return false;
     }
-    if (dateRange && dateRange.length === 2 && e.timestamp) {
-      const [start, end] = dateRange;
-      if (!(e.timestamp >= start.startOf && e.timestamp >= start && e.timestamp <= end)) {
-        // fallback: compare Date objects
-        const s = dateRange[0].toDate ? dateRange[0].toDate() : dateRange[0];
-        const en = dateRange[1].toDate ? dateRange[1].toDate() : dateRange[1];
-        if (e.timestamp < s || e.timestamp > en) return false;
-      }
-    }
+
     return true;
   });
 
-  const columns = [
+  // Table Columns
+  const columns: any[] = [
     {
       title: "Timestamp",
       dataIndex: "timestamp",
-      key: "timestamp",
-      render: (t) => (t ? new Date(t).toLocaleString() : "-"),
-      sorter: (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
+      render: (t: Date | string | null) =>
+        t ? new Date(t).toLocaleString() : "-",
+      sorter: (a: EventRecord, b: EventRecord) =>
+        new Date(a.timestamp || 0).getTime() -
+        new Date(b.timestamp || 0).getTime(),
       defaultSortOrder: "descend",
     },
     {
       title: "Agent",
       dataIndex: "agent_name",
-      key: "agent_name",
       filters: agents.map((a) => ({ text: a, value: a })),
-      onFilter: (value, record) => record.agent_name === value,
+      onFilter: (value: string, record: EventRecord) =>
+        record.agent_name === value,
     },
     {
       title: "Summary",
       dataIndex: "monitor_summary",
-      key: "monitor_summary",
-      render: (t) => <div style={{ maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t || <i>—</i>}</div>,
+      render: (t: string) => (
+        <div
+          style={{
+            maxWidth: 350,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {t || <i>—</i>}
+        </div>
+      ),
     },
     {
       title: "Risk",
       dataIndex: "risk_level",
-      key: "risk_level",
-      render: (r) => riskTag(r),
+      render: (r: string) => riskTag(r),
       filters: [
         { text: "Low", value: "low" },
         { text: "Medium", value: "medium" },
         { text: "High", value: "high" },
       ],
-      onFilter: (value, record) => (record.risk_level || "").toLowerCase() === value,
+      onFilter: (value: string, record: EventRecord) =>
+        (record.risk_level || "").toLowerCase() === value,
     },
     {
       title: "Anomaly",
       dataIndex: "anomaly_detected",
-      key: "anomaly_detected",
-      render: (a) => (a ? <Badge status="error" text="Yes" /> : <Badge status="success" text="No" />),
+      render: (a: boolean) =>
+        a ? (
+          <Badge status="error" text="Yes" />
+        ) : (
+          <Badge status="success" text="No" />
+        ),
       filters: [
         { text: "Yes", value: "yes" },
         { text: "No", value: "no" },
       ],
-      onFilter: (value, record) => (value === "yes" ? record.anomaly_detected : !record.anomaly_detected),
+      onFilter: (value: string, record: EventRecord) =>
+        value === "yes" ? record.anomaly_detected : !record.anomaly_detected,
     },
   ];
 
   return (
     <div style={{ padding: 24 }}>
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <Typography.Title level={4} style={{ margin: 0 }}>
+          AI Agent Monitoring Dashboard - {nickname}{" "}
+        </Typography.Title>
+      </div>
+        <Spin spinning={loading} tip="Loading events...">
+
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={24} md={16} lg={16} xl={16}>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={8}>
-              <Card>
-                <Statistic title="Total Events" value={stats.total} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Card>
-                <Statistic title="Anomalies" value={stats.anomalies} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={24} md={8}>
-              <Card>
-                <Statistic title="Risk: High" value={stats.byRisk.high} />
-              </Card>
-            </Col>
-          </Row>
+        {/* Total Events */}
+        <Col xs={24} sm={12} md={8}>
+          <Card
+            style={{
+              borderLeft: "5px solid #1677ff",
+              height: 150,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <Statistic
+              title={
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <RadarChartOutlined style={{ color: "#1677ff" }} />
+                  Total Events
+                </span>
+              }
+              value={stats.total}
+            />
+          </Card>
         </Col>
 
-        <Col xs={24} sm={24} md={8} lg={8} xl={8}>
-          <Card title="Risk Distribution" style={{ height: "100%" }}>
+        {/* Anomalies */}
+        <Col xs={24} sm={12} md={8}>
+          <Card
+            style={{
+              borderLeft: "5px solid #faad14",
+              height: 150,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <Statistic
+              title={
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <ExclamationCircleOutlined style={{ color: "#faad14" }} />
+                  Anomalies
+                </span>
+              }
+              value={stats.anomalies}
+            />
+          </Card>
+        </Col>
+
+        {/* High Risk */}
+        <Col xs={24} sm={24} md={8}>
+          <Card
+            style={{
+              borderLeft: "5px solid #ff4d4f",
+              height: 150,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <Statistic
+              title={
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <WarningOutlined style={{ color: "#ff4d4f" }} />
+                  Risk: High
+                </span>
+              }
+              value={stats.byRisk.high}
+            />
+          </Card>
+        </Col>
+      </Row>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24}>
+          <Card title="Risk Distribution" style={{ height: 300 }}>
             {stats.total === 0 ? (
               <Empty description="No data" />
             ) : (
-              <div style={{ height: 180 }}>
-                <ResponsiveContainer width="100%" height={160}>
+              <div style={{ width: "100%", height: 240 }}>
+                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={60} label>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={80}
+                      label
+                    >
                       {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
-                    <Legend />
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -212,14 +352,6 @@ export default function MonitorAgentDashboard() {
       <Card style={{ marginBottom: 16 }}>
         <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
           <Space>
-            <Input
-              placeholder="Search input/output/summary"
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 320 }}
-            />
-
             <Select
               placeholder="Filter by agent"
               allowClear
@@ -245,21 +377,26 @@ export default function MonitorAgentDashboard() {
               <Option value="medium">Medium</Option>
               <Option value="high">High</Option>
             </Select>
-
-            <RangePicker onChange={(r) => setDateRange(r)} />
-
-            <Button icon={<ReloadOutlined />} onClick={fetchEvents} />
           </Space>
 
           <Space>
-            <Button onClick={() => { setSearchText(""); setAgentFilter(undefined); setRiskFilter(undefined); setDateRange(null); }}>Reset</Button>
-            <Button type="primary" onClick={fetchEvents}>Refresh</Button>
+            <Button
+              onClick={() => {
+                setSearchText("");
+                setAgentFilter(undefined);
+                setRiskFilter(undefined);
+              }}
+            >
+              Reset
+            </Button>
+            <Button type="primary" onClick={fetchEvents}>
+              Refresh
+            </Button>
           </Space>
         </Space>
       </Card>
 
       <Card>
-        <Spin spinning={loading} tip="Loading events...">
           <Table
             columns={columns}
             dataSource={filteredEvents}
@@ -270,11 +407,15 @@ export default function MonitorAgentDashboard() {
             pagination={{ pageSize: 12 }}
             locale={{ emptyText: <Empty description="No events" /> }}
           />
-        </Spin>
       </Card>
 
       <Drawer
-        title={selectedEvent ? `${selectedEvent.agent_name} — ${selectedEvent.risk_level?.toUpperCase() || ""}` : "Event details"}
+       title={
+  selectedEvent
+    ? `${selectedEvent.agent_name} Agent - ${selectedEvent.risk_level?.toUpperCase() || "N/A"} Risk`
+    : "Event details"
+}
+
         visible={drawerVisible}
         width={720}
         onClose={() => setDrawerVisible(false)}
@@ -282,25 +423,30 @@ export default function MonitorAgentDashboard() {
         {selectedEvent ? (
           <>
             <Descriptions bordered column={1} size="small">
-              <Descriptions.Item label="Timestamp">{selectedEvent.timestamp ? new Date(selectedEvent.timestamp).toLocaleString() : "-"}</Descriptions.Item>
-              <Descriptions.Item label="Agent">{selectedEvent.agent_name}</Descriptions.Item>
-              <Descriptions.Item label="Session/User">{`${selectedEvent.session_id || "-"} / ${selectedEvent.user_id || "-"}`}</Descriptions.Item>
-              <Descriptions.Item label="Risk">{riskTag(selectedEvent.risk_level)}</Descriptions.Item>
-              <Descriptions.Item label="Anomaly Detected">{selectedEvent.anomaly_detected ? "Yes" : "No"}</Descriptions.Item>
-              <Descriptions.Item label="AI Summary">{selectedEvent.monitor_summary || "—"}</Descriptions.Item>
+              <Descriptions.Item label="Timestamp">
+                {selectedEvent.timestamp
+                  ? new Date(selectedEvent.timestamp).toLocaleString()
+                  : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Agent">
+                {selectedEvent.agent_name}
+              </Descriptions.Item>
+              <Descriptions.Item label="Session/User">
+                {`${selectedEvent.session_id || "-"} / ${
+                  selectedEvent.user_id || "-"
+                }`}
+              </Descriptions.Item>
+              <Descriptions.Item label="Risk">
+                {riskTag(selectedEvent.risk_level)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Anomaly Detected">
+                {selectedEvent.anomaly_detected ? "Yes" : "No"}
+              </Descriptions.Item>
+              <Descriptions.Item label="AI Summary">
+                {selectedEvent.monitor_summary || "—"}
+              </Descriptions.Item>
             </Descriptions>
 
-            <Card title="Input Data" size="small" style={{ marginTop: 12 }}>
-              <pre style={{ maxHeight: 220, overflow: "auto" }}>{JSON.stringify(selectedEvent.input_data, null, 2)}</pre>
-            </Card>
-
-            <Card title="Output Data" size="small" style={{ marginTop: 12 }}>
-              <pre style={{ maxHeight: 220, overflow: "auto" }}>{JSON.stringify(selectedEvent.output_data, null, 2)}</pre>
-            </Card>
-
-            <Card title="AI Agent Details" size="small" style={{ marginTop: 12 }}>
-              <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(selectedEvent.monitoring || selectedEvent.monitor_result || {}, null, 2)}</pre>
-            </Card>
           </>
         ) : (
           <Empty />
@@ -315,15 +461,36 @@ export default function MonitorAgentDashboard() {
             {events.slice(0, 50).map((e) => (
               <Timeline.Item
                 key={e._id || `${e.timestamp}-${e.agent_name}`}
-                color={(e.risk_level || "low").toLowerCase() === "high" ? "red" : (e.risk_level || "low").toLowerCase() === "medium" ? "orange" : "green"}
+                color={
+                  (e.risk_level || "low").toLowerCase() === "high"
+                    ? "red"
+                    : (e.risk_level || "low").toLowerCase() === "medium"
+                    ? "orange"
+                    : "green"
+                }
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
                   <div style={{ flex: 1 }}>
                     <b>{e.agent_name}</b>
-                    <div style={{ fontSize: 12 }}>{e.monitor_summary || (e.output_data && JSON.stringify(e.output_data).slice(0, 120))}</div>
+                    <div style={{ fontSize: 12 }}>
+                      {e.monitor_summary ||
+                        (typeof e.output_data === 'string' 
+                          ? e.output_data 
+                          : JSON.stringify(e.output_data).slice(0, 120))}
+                    </div>
                   </div>
                   <div style={{ textAlign: "right", minWidth: 160 }}>
-                    <div style={{ fontSize: 12 }}>{e.timestamp ? new Date(e.timestamp).toLocaleString() : "-"}</div>
+                    <div style={{ fontSize: 12 }}>
+                      {e.timestamp
+                        ? new Date(e.timestamp).toLocaleString()
+                        : "-"}
+                    </div>
                     <div>{riskTag(e.risk_level)}</div>
                   </div>
                 </div>
@@ -332,6 +499,7 @@ export default function MonitorAgentDashboard() {
           </Timeline>
         )}
       </Card>
+    </Spin>
     </div>
   );
 }
