@@ -36,5 +36,5 @@ export const GLOBAL_CONFIG: GlobalConfig = {
 	apiBaseUrl2: import.meta.env.VITE_APP_API_BASE_URL2,
 	apiBaseUrl3: import.meta.env.VITE_APP_API_BASE_URL3,
 	routerMode: import.meta.env.VITE_APP_ROUTER_MODE || "frontend",
-	dashPath: import.meta.env.VITE_APP_PUBLIC_PATH_DASH || "/workbench",
+	dashPath: import.meta.env.VITE_APP_PUBLIC_PATH_DASH || "/therapy",
 };

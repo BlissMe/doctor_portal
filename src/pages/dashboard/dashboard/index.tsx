@@ -303,7 +303,7 @@ export default function Workbench() {
       </div>
 
       {/* Comparison and Accuracy Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="flex flex-col p-4">
           <Title as="h4" className="mb-2 font-semibold">
             Comparison Status
@@ -370,7 +370,7 @@ export default function Workbench() {
             <p className="mt-2 text-gray-600">Match / (Match + Mismatch)</p>
           </div>
         </Card>
-      </div>
+      </div> */}
 
       {/* Users Table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
