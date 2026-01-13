@@ -384,8 +384,8 @@ export default function Workbench() {
                   <th className="table-head">UserID</th>
                   <th className="table-head">System Assessment</th>
                   <th className="table-head">Self Assessment</th>
-                  <th className="table-head">Comparison</th>
-                  <th className="table-head">Tracker</th>
+{/*                   <th className="table-head">Comparison</th>
+ */}                  <th className="table-head">Tracker</th>
                 </tr>
               </thead>
               <tbody className="table-body">
@@ -424,7 +424,7 @@ export default function Workbench() {
                             selfLevel.slice(1)}
                         </Tag>
                       </td>
-                      <td className="table-cell">
+                    {/*   <td className="table-cell">
                         <Tag
                           color={
                             comparisonStatus === "Match"
@@ -436,7 +436,7 @@ export default function Workbench() {
                         >
                           {comparisonStatus}
                         </Tag>
-                      </td>
+                      </td> */}
                       <td className="table-cell">
                         <ArrowRightCircle
                           size={28}
